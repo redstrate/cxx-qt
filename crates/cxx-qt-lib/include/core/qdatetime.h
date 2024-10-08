@@ -69,5 +69,7 @@ qdatetimeToMSecsSinceEpoch(const QDateTime& datetime);
 qdatetimeToSecsSinceEpoch(const QDateTime& datetime);
 void
 qdatetimeSetTimeZone(QDateTime& datetime, const QTimeZone& timeZone);
+QDateTime
+qdatetimeFromQString(const QString& string, Qt::DateFormat format);
 }
 }

@@ -156,5 +156,11 @@ qdatetimeSetTimeZone(QDateTime& datetime, const QTimeZone& timeZone)
 #endif
 }
 
+QDateTime
+qdatetimeFromQString(const QString& string, const Qt::DateFormat format)
+{
+  return QDateTime::fromString(string, format);
+}
+
 }
 }
