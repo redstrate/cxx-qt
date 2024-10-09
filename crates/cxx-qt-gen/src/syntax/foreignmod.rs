@@ -3,10 +3,10 @@
 //
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-use proc_macro2::{TokenStream, TokenTree};
-use quote::{quote, ToTokens};
+use proc_macro2::TokenStream;
 use syn::{
     parse::{Parse, ParseStream, Parser},
+    parse_quote,
     spanned::Spanned,
     Attribute, Error, FnArg, ForeignItem, ForeignItemType, Ident, ItemForeignMod, Path, Receiver,
     Result, Signature, Token, Visibility,
@@ -53,34 +53,26 @@ fn verbatim_to_foreign_type(tokens: &TokenStream) -> Result<Option<ForeignItemTy
             let type_token: Token![type] = input.parse()?;
             let ident: Ident = input.parse()?;
 
-            // Read until the next semi colon
+            // Read until the end of the cursor
             input.step(|cursor| {
                 let mut rest = *cursor;
-                while let Some((tt, next)) = rest.token_tree() {
-                    match &tt {
-                        TokenTree::Punct(punct) if punct.as_char() == ';' => {
-                            return Ok(((), next));
-                        }
-                        _ => rest = next,
-                    }
+                while let Some((_, next)) = rest.token_tree() {
+                    rest = next;
                 }
-                Err(cursor.error("no `;` was found after this point"))
+                Ok(((), rest))
             })?;
 
-            Ok(Some(syn::parse2(
-                quote! {
-                    #(#attrs)*
-                    #visibility #type_token #ident;
-                }
-                .into_token_stream(),
-            )?))
+            Ok(Some(parse_quote! {
+                #(#attrs)*
+                #visibility #type_token #ident;
+            }))
         } else {
             // Error as we have parsed the attributes and visiblity but have an unknown stream
             //
             // To return None here we should instead peek
             Err(Error::new(
                 tokens.span(),
-                "Unsupported verbatim input in ForeignItem",
+                "Unsupported verbatim input in ForeignItem!",
             ))
         }
     }
@@ -128,14 +120,14 @@ impl Parse for ForeignTypeIdentAlias {
                 if path.segments.len() != 2 {
                     return Err(Error::new(
                         path.span(),
-                        "Type alias path must have at exactly two segments, super::T",
+                        "Type alias path must have at exactly two segments, super::T!",
                     ));
                 }
 
                 if path.segments[0].ident != "super" {
                     return Err(Error::new(
                         path.span(),
-                        "Type alias path must have super as the first segment, super::T",
+                        "Type alias path must have super as the first segment, super::T!",
                     ));
                 }
 
@@ -145,7 +137,7 @@ impl Parse for ForeignTypeIdentAlias {
             if ident_left == ident_right {
                 return Err(Error::new(
                     path.span(),
-                    "Type alias path must have differing idents, type A = super::B. A and B cannot be the same.",
+                    "Type alias path must have differing idents, type A = super::B. A and B cannot be the same!",
                 ));
             }
 
@@ -160,7 +152,7 @@ impl Parse for ForeignTypeIdentAlias {
             // To return None here we should instead peek
             Err(Error::new(
                 input.span(),
-                "Unsupported verbatim input in ForeignItem",
+                "Unsupported verbatim input in ForeignItem!",
             ))
         }
     }
@@ -171,28 +163,28 @@ pub fn self_type_from_foreign_fn(signature: &Signature) -> Result<Receiver> {
         if !receiver.attrs.is_empty() {
             return Err(Error::new(
                 receiver.span(),
-                "Attributes on the `self:` receiver are not supported",
+                "Attributes on the `self:` receiver are not supported!",
             ));
         }
 
         if receiver.mutability.is_some() {
             return Err(Error::new(
                 receiver.span(),
-                "mut on self (i.e. `&mut self`) are not supported, use `self: Pin<&mut T>` instead",
+                "mut on self (i.e. `&mut self`) are not supported! Use `self: Pin<&mut T>` instead",
             ));
         }
 
         if receiver.reference.is_some() {
             return Err(Error::new(
                 receiver.span(),
-                "Reference on self (i.e. `&self`) are not supported, use `self: &T` instead",
+                "Reference on self (i.e. `&self`) are not supported! Use `self: &T` instead",
             ));
         }
 
         if receiver.colon_token.is_none() {
             return Err(Error::new(
                 receiver.span(),
-                "`self` is not supported as receiver, use `self: T` to indicate a type.",
+                "`self` is not supported as receiver! Use `self: T` to indicate a type.",
             ));
         }
 
@@ -200,16 +192,17 @@ pub fn self_type_from_foreign_fn(signature: &Signature) -> Result<Receiver> {
     } else {
         Err(Error::new_spanned(
             signature,
-            "Expected first argument to be a `self:` receiver",
+            "Expected first argument to be a `self:` receiver!",
         ))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use syn::{parse_quote, ForeignItemFn};
-
     use super::*;
+    use crate::tests::assert_parse_errors;
+    use quote::ToTokens;
+    use syn::{parse_quote, ForeignItemFn};
 
     #[test]
     fn test_foreign_mod_to_foreign_item_types() {
@@ -232,6 +225,17 @@ mod tests {
     }
 
     #[test]
+    fn test_foreign_mod_to_foreign_item_types_invalid() {
+        let item: ItemForeignMod = parse_quote! {
+            extern "RustQt" {
+                fn my_function() {}
+            }
+        };
+        let result = foreign_mod_to_foreign_item_types(&item);
+        assert!(result.is_err())
+    }
+
+    #[test]
     fn test_foreign_fn_self() {
         let foreign_fn: ForeignItemFn = parse_quote! {
             fn foo(self: &T, a: A) -> B;
@@ -242,80 +246,55 @@ mod tests {
 
     #[test]
     fn test_foreign_fn_invalid_self() {
-        macro_rules! test {
-            ($($tt:tt)*) => {
-                let foreign_fn: ForeignItemFn = parse_quote! {
-                    $($tt)*
-                };
-                assert!(self_type_from_foreign_fn(&foreign_fn.sig).is_err());
-            }
+        assert_parse_errors! {
+            |function: ForeignItemFn| self_type_from_foreign_fn(&function.sig) =>
+            // Missing self
+            { fn foo(a: A) -> B; }
+            // self without type
+            { fn foo(self); }
+            // self with mut
+            { fn foo(mut self: T); }
+            // self reference
+            { fn foo(&self); }
+            // self reference with mut
+            { fn foo(&mut self); }
+            // attribute on self type
+            { fn foo(#[attr] self: T); }
         }
-        // Missing self
-        test! { fn foo(a: A) -> B; }
-        // self without type
-        test! { fn foo(self); }
-        // self with mut
-        test! { fn foo(mut self: T); }
-        // self reference
-        test! { fn foo(&self); }
-        // self reference with mut
-        test! { fn foo(&mut self); }
-        // attribute on self type
-        test! { fn foo(#[attr] self: T); }
+    }
+
+    #[test]
+    fn test_parse_invalid_type_aliases() {
+        assert_parse_errors! {
+            syn::parse2::<ForeignTypeIdentAlias> =>
+
+            { struct MyStruct; }
+            { type A = B; }
+            { type A = super::module::B; }
+            { type A = crate::B; }
+            { type A = super::A; }
+        }
     }
 
     #[test]
     fn test_foreign_type_ident_alias() {
-        let alias = syn::parse2::<ForeignTypeIdentAlias>(quote! {
+        let alias: ForeignTypeIdentAlias = parse_quote! {
             #[attr]
             type A = super::B;
-        })
-        .unwrap();
+        };
+
         assert_eq!(alias.attrs.len(), 1);
         assert_eq!(alias.ident_left, "A");
         assert_eq!(alias.ident_right, "B");
     }
 
     #[test]
-    fn test_foreign_type_ident_alias_segments_one() {
-        let parse = syn::parse2::<ForeignTypeIdentAlias>(quote! {
-            type A = B;
-        });
-        assert!(parse.is_err());
-    }
-
-    #[test]
-    fn test_foreign_type_ident_alias_segments_three() {
-        let parse = syn::parse2::<ForeignTypeIdentAlias>(quote! {
-            type A = super::module::B;
-        });
-        assert!(parse.is_err());
-    }
-
-    #[test]
-    fn test_foreign_type_ident_alias_no_super() {
-        let parse = syn::parse2::<ForeignTypeIdentAlias>(quote! {
-            type A = crate::B;
-        });
-        assert!(parse.is_err());
-    }
-
-    #[test]
-    fn test_foreign_type_ident_alias_left_is_right() {
-        let parse = syn::parse2::<ForeignTypeIdentAlias>(quote! {
-            type A = super::A;
-        });
-        assert!(parse.is_err());
-    }
-
-    #[test]
     fn test_foreign_type_ident_visibility() {
         // Ensure that visibility does not error, later it might be stored
-        let alias = syn::parse2::<ForeignTypeIdentAlias>(quote! {
+        let alias: ForeignTypeIdentAlias = parse_quote! {
             #[attr]
             pub type A = super::B;
-        })
-        .unwrap();
+        };
         assert_eq!(alias.attrs.len(), 1);
         assert_eq!(alias.ident_left, "A");
         assert_eq!(alias.ident_right, "B");

@@ -36,16 +36,20 @@ template<typename T>
 class CxxQtThread final
 {
 public:
-  CxxQtThread(::std::shared_ptr<CxxQtGuardedPointer<T>> obj,
-              ::std::shared_ptr<::std::recursive_mutex> rustObjMutex)
+  CxxQtThread(::std::shared_ptr<CxxQtGuardedPointer<T>> obj)
     : m_obj(obj)
-    , m_rustObjMutex(rustObjMutex)
   {
   }
 
   ~CxxQtThread() = default;
   CxxQtThread(const CxxQtThread<T>& other) = default;
   CxxQtThread(CxxQtThread<T>&& other) = default;
+
+  bool isDestroyed() const
+  {
+    const auto guard = ::std::shared_lock(m_obj->mutex);
+    return m_obj->ptr == nullptr;
+  }
 
   template<typename A>
   void queue(::rust::Fn<void(T& self, ::rust::Box<A> arg)> func,
@@ -61,17 +65,12 @@ public:
 
     // Construct the lambda
     auto obj = m_obj;
-    auto rustObjMutex = m_rustObjMutex;
     auto lambda = [obj = ::std::move(obj),
-                   rustObjMutex = ::std::move(rustObjMutex),
                    func = ::std::move(func),
                    arg = ::std::move(arg)]() mutable {
       // Ensure that we can read the pointer and it's not being written to
       const auto guard = ::std::shared_lock(obj->mutex);
       if (obj->ptr) {
-        // Ensure that the rustObj is locked
-        const ::std::lock_guard<::std::recursive_mutex> guardRustObj(
-          *rustObjMutex);
         func(*obj->ptr, ::std::move(arg));
       } else {
         qWarning()
@@ -89,7 +88,6 @@ public:
 
 private:
   ::std::shared_ptr<CxxQtGuardedPointer<T>> m_obj;
-  ::std::shared_ptr<::std::recursive_mutex> m_rustObjMutex;
 };
 
 template<typename T>
@@ -115,6 +113,13 @@ cxxQtThreadQueue(const CxxQtThread<T>& cxxQtThread,
   cxxQtThread.queue(::std::move(func), ::std::move(arg));
 }
 
+template<typename T>
+bool
+cxxQtThreadIsDestroyed(const CxxQtThread<T>& cxxQtThread)
+{
+  return cxxQtThread.isDestroyed();
+}
+
 } // namespace cxxqt1
 } // namespace rust
 
@@ -124,7 +129,6 @@ namespace rust {
 
 template<typename T>
 struct IsRelocatable<::rust::cxxqt1::CxxQtThread<T>> : ::std::true_type
-{
-};
+{};
 
 } // namespace rust

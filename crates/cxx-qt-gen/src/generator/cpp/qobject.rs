@@ -6,9 +6,8 @@
 use crate::{
     generator::{
         cpp::{
-            constructor, cxxqttype, fragment::CppFragment, inherit, locking,
-            method::generate_cpp_methods, property::generate_cpp_properties, qenum,
-            signal::generate_cpp_signals, threading,
+            constructor, cxxqttype, fragment::CppFragment, inherit, method::generate_cpp_methods,
+            property::generate_cpp_properties, qenum, signal::generate_cpp_signals, threading,
         },
         naming::{namespace::NamespaceName, qobject::QObjectNames},
         structuring::StructuredQObject,
@@ -114,23 +113,16 @@ impl GeneratedCppQObject {
             has_qobject_macro: qobject.has_qobject_macro,
         };
 
-        // Ensure that we include MaybeLockGuard<T> that is used in multiple places
-        generated
-            .blocks
-            .includes
-            .insert("#include <cxx-qt/maybelockguard.h>".to_owned());
+        let base_class = if let Some(ident) = &qobject.base_class {
+            type_names.lookup(ident)?.cxx_qualified()
+        } else if qobject.has_qobject_macro {
+            "QObject".to_string()
+        } else {
+            // CODECOV_EXCLUDE_START
+            unreachable!("Cannot have an empty #[base] attribute  with no #[qobject] attribute");
+            // CODECOV_EXCLUDE_STOP
+        };
 
-        // Build the base class
-        let base_class = qobject.base_class.clone().unwrap_or_else(|| {
-            // If there is a QObject macro then assume the base class is QObject
-            if qobject.has_qobject_macro {
-                "QObject".to_string()
-            } else {
-                unreachable!(
-                    "Cannot have an empty #[base] attribute  with no #[qobject] attribute"
-                );
-            }
-        });
         generated.blocks.base_classes.push(base_class.clone());
 
         // Add the CxxQtType rust and rust_mut methods
@@ -143,20 +135,21 @@ impl GeneratedCppQObject {
             &qobject.properties,
             &qobject_idents,
             type_names,
+            structured_qobject,
         )?);
         generated.blocks.append(&mut generate_cpp_methods(
-            &qobject.methods,
-            &qobject_idents,
+            &structured_qobject.methods,
             type_names,
         )?);
         generated.blocks.append(&mut generate_cpp_signals(
-            &qobject.signals,
+            &structured_qobject.signals,
             &qobject_idents,
             type_names,
         )?);
+
         generated.blocks.append(&mut inherit::generate(
-            &qobject.inherited_methods,
-            &qobject.base_class,
+            &structured_qobject.inherited_methods,
+            &qobject.base_class.as_ref().map(|ident| ident.to_string()),
             type_names,
         )?);
         generated.blocks.append(&mut qenum::generate_on_qobject(
@@ -168,23 +161,15 @@ impl GeneratedCppQObject {
         // If this type has threading enabled then add generation
         //
         // Note that threading also includes locking C++ generation
-        if qobject.threading {
-            // The parser phase should check that this is true
-            debug_assert!(qobject.locking);
-
+        if structured_qobject.threading {
             let (initializer, mut blocks) = threading::generate(&qobject_idents)?;
-            generated.blocks.append(&mut blocks);
-            class_initializers.push(initializer);
-        // If this type has locking enabled then add generation
-        } else if qobject.locking {
-            let (initializer, mut blocks) = locking::generate()?;
             generated.blocks.append(&mut blocks);
             class_initializers.push(initializer);
         }
 
         generated.blocks.append(&mut constructor::generate(
             &generated,
-            &qobject.constructors,
+            &structured_qobject.constructors,
             base_class,
             &class_initializers,
             type_names,
@@ -197,8 +182,9 @@ impl GeneratedCppQObject {
 #[cfg(test)]
 mod tests {
     use super::*;
-
+    use crate::generator::mock_qml_singleton;
     use crate::{generator::structuring::Structures, parser::Parser};
+    use quote::format_ident;
     use syn::{parse_quote, ItemMod};
 
     #[test]
@@ -222,13 +208,12 @@ mod tests {
         assert_eq!(cpp.rust_struct.cxx_unqualified(), "MyObjectRust");
         assert_eq!(cpp.namespace_internals, "cxx_qt_my_object");
 
-        assert_eq!(cpp.blocks.base_classes.len(), 3);
+        assert_eq!(cpp.blocks.base_classes.len(), 2);
         assert_eq!(cpp.blocks.base_classes[0], "QObject");
         assert_eq!(
             cpp.blocks.base_classes[1],
             "::rust::cxxqt1::CxxQtType<MyObjectRust>"
         );
-        assert_eq!(cpp.blocks.base_classes[2], "::rust::cxxqt1::CxxQtLocking");
         assert_eq!(cpp.blocks.metaobjects.len(), 0);
     }
 
@@ -239,25 +224,31 @@ mod tests {
             mod ffi {
                 extern "RustQt" {
                     #[qobject]
-                    #[base = "QStringListModel"]
+                    #[base = QStringListModel]
                     type MyObject = super::MyObjectRust;
                 }
             }
         };
         let parser = Parser::from(module).unwrap();
         let structures = Structures::new(&parser.cxx_qt_data).unwrap();
+        let mut type_names = TypeNames::mock();
+
+        type_names.mock_insert(
+            "QStringListModel",
+            Some(format_ident!("qobject")),
+            None,
+            None,
+        );
 
         let cpp =
-            GeneratedCppQObject::from(structures.qobjects.first().unwrap(), &TypeNames::mock())
-                .unwrap();
+            GeneratedCppQObject::from(structures.qobjects.first().unwrap(), &type_names).unwrap();
         assert_eq!(cpp.namespace_internals, "cxx_qt::cxx_qt_my_object");
-        assert_eq!(cpp.blocks.base_classes.len(), 3);
+        assert_eq!(cpp.blocks.base_classes.len(), 2);
         assert_eq!(cpp.blocks.base_classes[0], "QStringListModel");
         assert_eq!(
             cpp.blocks.base_classes[1],
             "::rust::cxxqt1::CxxQtType<MyObjectRust>"
         );
-        assert_eq!(cpp.blocks.base_classes[2], "::rust::cxxqt1::CxxQtLocking");
         assert_eq!(cpp.blocks.metaobjects.len(), 0);
     }
 
@@ -291,17 +282,7 @@ mod tests {
 
     #[test]
     fn test_generated_cpp_qobject_singleton() {
-        let module: ItemMod = parse_quote! {
-            #[cxx_qt::bridge(namespace = "cxx_qt")]
-            mod ffi {
-                extern "RustQt" {
-                    #[qobject]
-                    #[qml_element]
-                    #[qml_singleton]
-                    type MyObject = super::MyObjectRust;
-                }
-            }
-        };
+        let module = mock_qml_singleton();
         let parser = Parser::from(module).unwrap();
         let structures = Structures::new(&parser.cxx_qt_data).unwrap();
 

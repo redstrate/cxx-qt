@@ -5,16 +5,13 @@
 
 use crate::{
     naming::Name,
-    parser::{
-        constructor::Constructor, inherit::ParsedInheritedMethod, method::ParsedMethod,
-        property::ParsedQProperty, signals::ParsedSignal,
-    },
-    syntax::{
-        attribute::attribute_take_path, expr::expr_to_string, foreignmod::ForeignTypeIdentAlias,
-        path::path_compare_str,
-    },
+    parser::{property::ParsedQProperty, require_attributes},
+    syntax::{expr::expr_to_string, foreignmod::ForeignTypeIdentAlias, path::path_compare_str},
 };
-use syn::{Attribute, Error, Ident, ItemImpl, Meta, Result};
+#[cfg(test)]
+use quote::format_ident;
+
+use syn::{Attribute, Error, Expr, Ident, Meta, Result};
 
 /// Metadata for registering QML element
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -23,60 +20,90 @@ pub struct QmlElementMetadata {
     pub uncreatable: bool,
     pub singleton: bool,
 }
-
 /// A representation of a QObject within a CXX-Qt [syn::ItemMod]
 ///
 /// This has initial splitting of [syn::Item]'s into relevant blocks, other phases will
 /// then mutate these [syn::Item]'s for generation purposes.
 pub struct ParsedQObject {
     /// The base class of the struct
-    pub base_class: Option<String>,
+    pub base_class: Option<Ident>,
     /// The name of the QObject
     pub name: Name,
     /// The ident of the inner type of the QObject
     pub rust_type: Ident,
-    /// Representation of the Q_SIGNALS for the QObject
-    pub signals: Vec<ParsedSignal>,
-    /// List of methods that need to be implemented on the C++ object in Rust
-    ///
-    /// These could also be exposed as Q_INVOKABLE on the C++ object
-    pub methods: Vec<ParsedMethod>,
-    /// List of inherited methods
-    pub inherited_methods: Vec<ParsedInheritedMethod>,
-    /// Any user-defined constructors
-    pub constructors: Vec<Constructor>,
     /// List of properties that need to be implemented on the C++ object
     ///
     /// These will be exposed as Q_PROPERTY on the C++ object
     pub properties: Vec<ParsedQProperty>,
     /// List of specifiers to register with in QML
     pub qml_metadata: Option<QmlElementMetadata>,
-    /// Whether locking is enabled for this QObject
-    pub locking: bool,
-    /// Whether threading has been enabled for this QObject
-    pub threading: bool,
     /// Whether this type has a #[qobject] / Q_OBJECT macro
     pub has_qobject_macro: bool,
-
     /// The original declaration entered by the user, i.e. a type alias with a list of attributes
     pub declaration: ForeignTypeIdentAlias,
 }
 
 impl ParsedQObject {
+    const ALLOWED_ATTRS: [&'static str; 10] = [
+        "cxx_name",
+        "rust_name",
+        "namespace",
+        "doc",
+        "qobject",
+        "base",
+        "qml_element",
+        "qml_uncreatable",
+        "qml_singleton",
+        "qproperty",
+    ];
+    #[cfg(test)]
+    pub fn mock() -> Self {
+        ParsedQObject {
+            base_class: None,
+            name: Name::new(format_ident!("MyObject")),
+            rust_type: format_ident!("MyObjectRust"),
+            properties: vec![],
+            qml_metadata: None,
+            has_qobject_macro: false,
+            declaration: ForeignTypeIdentAlias {
+                attrs: vec![],
+                ident_left: format_ident!("MyObject"),
+                ident_right: format_ident!("MyObjectRust"),
+            },
+        }
+    }
+
     /// Parse a ForeignTypeIdentAlias into a [ParsedQObject] with the index of the #[qobject] specified
     pub fn parse(
-        mut declaration: ForeignTypeIdentAlias,
+        declaration: ForeignTypeIdentAlias,
         namespace: Option<&str>,
         module: &Ident,
     ) -> Result<Self> {
-        // Find any QML metadata
-        let qml_metadata =
-            Self::parse_qml_metadata(&declaration.ident_left, &mut declaration.attrs)?;
+        let attributes = require_attributes(&declaration.attrs, &Self::ALLOWED_ATTRS)?;
+        let has_qobject_macro = attributes.contains_key("qobject");
 
-        // Find if there is any base class
-        let base_class = attribute_take_path(&mut declaration.attrs, &["base"])
-            .map(|attr| expr_to_string(&attr.meta.require_name_value()?.value))
+        let base_class = attributes
+            .get("base")
+            .map(|attr| -> Result<Ident> {
+                let expr = &attr.meta.require_name_value()?.value;
+                if let Expr::Path(path_expr) = expr {
+                    Ok(path_expr.path.require_ident()?.clone())
+                } else {
+                    Err(Error::new_spanned(
+                        expr,
+                        "Base must be a identifier and cannot be empty!",
+                    ))
+                }
+            })
             .transpose()?;
+
+        // Ensure that if there is no qobject macro that a base class is specificed
+        if !has_qobject_macro && base_class.is_none() {
+            return Err(Error::new_spanned(
+                declaration.ident_left,
+                "A type without a #[qobject] attribute must specify a #[base] attribute!",
+            ));
+        }
 
         let name = Name::from_ident_and_attrs(
             &declaration.ident_left,
@@ -85,9 +112,12 @@ impl ParsedQObject {
             Some(module),
         )?;
 
+        // Find any QML metadata
+        let qml_metadata = Self::parse_qml_metadata(&name, &declaration.attrs)?;
+
         // Parse any properties in the type
         // and remove the #[qproperty] attribute
-        let properties = Self::parse_property_attributes(&mut declaration.attrs)?;
+        let properties = Self::parse_property_attributes(&declaration.attrs)?;
         let inner = declaration.ident_right.clone();
 
         Ok(Self {
@@ -95,126 +125,41 @@ impl ParsedQObject {
             declaration,
             name,
             rust_type: inner,
-            signals: vec![],
-            methods: vec![],
-            inherited_methods: vec![],
-            constructors: vec![],
             properties,
             qml_metadata,
-            locking: true,
-            threading: false,
-            has_qobject_macro: false,
+            has_qobject_macro,
         })
     }
 
-    fn parse_qml_metadata(
-        qobject_ident: &Ident,
-        attrs: &mut Vec<Attribute>,
-    ) -> Result<Option<QmlElementMetadata>> {
-        // Find if there is a qml_element attribute
-        if let Some(attr) = attribute_take_path(attrs, &["qml_element"]) {
-            // Extract the name of the qml_element
-            let name = match attr.meta {
+    fn parse_qml_metadata(name: &Name, attrs: &[Attribute]) -> Result<Option<QmlElementMetadata>> {
+        let attributes = require_attributes(attrs, &Self::ALLOWED_ATTRS)?;
+        if let Some(attr) = attributes.get("qml_element") {
+            // Extract the name of the qml_element from macro, else use the c++ name
+            // This will use the name provided by cxx_name if that attr was present
+            let name = match &attr.meta {
                 Meta::NameValue(name_value) => expr_to_string(&name_value.value)?,
-                _ => qobject_ident.to_string(),
+                _ => name.cxx_unqualified(),
             };
-
-            // Determine if this element is uncreatable
-            let uncreatable = attribute_take_path(attrs, &["qml_uncreatable"]).is_some();
-
-            // Determine if this element is a singleton
-            let singleton = attribute_take_path(attrs, &["qml_singleton"]).is_some();
-
+            let uncreatable = attributes.contains_key("qml_uncreatable");
+            let singleton = attributes.contains_key("qml_singleton");
             return Ok(Some(QmlElementMetadata {
                 name,
                 uncreatable,
                 singleton,
             }));
         }
-
         Ok(None)
     }
 
-    pub fn parse_trait_impl(&mut self, imp: ItemImpl) -> Result<()> {
-        let (not, trait_path, _) = &imp
-            .trait_
-            .as_ref()
-            .ok_or_else(|| Error::new_spanned(imp.clone(), "Expected trait impl!"))?;
-
-        if let Some(attr) = imp.attrs.first() {
-            return Err(Error::new_spanned(
-                attr,
-                "Attributes are not allowed on trait impls in cxx_qt::bridge",
-            ));
-        }
-
-        if path_compare_str(trait_path, &["cxx_qt", "Locking"]) {
-            if imp.unsafety.is_none() {
-                return Err(Error::new_spanned(
-                    trait_path,
-                    "cxx_qt::Locking must be an unsafe impl",
-                ));
-            }
-
-            if not.is_none() {
-                return Err(Error::new_spanned(
-                    trait_path,
-                    "cxx_qt::Locking is enabled by default, it can only be negated.",
-                ));
-            }
-
-            // Check that cxx_qt::Threading is not enabled
-            if self.threading {
-                return Err(Error::new_spanned(
-                    trait_path,
-                    "cxx_qt::Locking must be enabled if cxx_qt::Threading is enabled",
-                ));
-            }
-
-            self.locking = false;
-            Ok(())
-        } else if path_compare_str(trait_path, &["cxx_qt", "Threading"]) {
-            if not.is_some() {
-                return Err(Error::new_spanned(
-                    trait_path,
-                    "Negative impls for cxx_qt::Threading are not allowed",
-                ));
-            }
-
-            // Check that cxx_qt::Locking is not disabled
-            if !self.locking {
-                return Err(Error::new_spanned(
-                    trait_path,
-                    "cxx_qt::Locking must be enabled if cxx_qt::Threading is enabled",
-                ));
-            }
-
-            self.threading = true;
-            Ok(())
-        } else if path_compare_str(trait_path, &["cxx_qt", "Constructor"]) {
-            self.constructors.push(Constructor::parse(imp)?);
-            Ok(())
-        } else {
-            // TODO: Give suggestions on which trait might have been meant
-            Err(Error::new_spanned(
-                trait_path,
-                "Unsupported trait!\nCXX-Qt currently only supports:\n- cxx_qt::Threading\n- cxx_qt::Constructor\n- cxx_qt::Locking\nNote that the trait must always be fully-qualified."
-            ))
-        }
-    }
-
-    fn parse_property_attributes(attrs: &mut Vec<Attribute>) -> Result<Vec<ParsedQProperty>> {
-        let mut properties = vec![];
-
-        // Note that once extract_if is stable, this would allow for comparing all the
-        // elements once using path_compare_str and then building ParsedQProperty
-        // from the extracted elements.
+    fn parse_property_attributes(attrs: &[Attribute]) -> Result<Vec<ParsedQProperty>> {
+        // Once extract_if is stable, this would allow comparing all the elements using
+        // path_compare_str and building ParsedQProperty from the extracted elements.
         // https://doc.rust-lang.org/nightly/std/vec/struct.Vec.html#method.extract_if
-        while let Some(attr) = attribute_take_path(attrs, &["qproperty"]) {
-            properties.push(ParsedQProperty::parse(attr)?);
-        }
-
-        Ok(properties)
+        attrs
+            .iter()
+            .filter(|attr| path_compare_str(attr.meta.path(), &["qproperty"]))
+            .map(ParsedQProperty::parse)
+            .collect::<Result<Vec<_>>>()
     }
 }
 
@@ -223,176 +168,146 @@ pub mod tests {
     use super::*;
 
     use crate::parser::tests::f64_type;
+    use crate::tests::assert_parse_errors;
     use quote::format_ident;
-    use syn::{parse_quote, ItemImpl};
+    use syn::parse_quote;
 
+    macro_rules! parse_qobject {
+        { $($input:tt)* } => {
+            {
+                let input = parse_quote! {
+                    $($input)*
+                };
+                ParsedQObject::parse(input, None, &format_ident!("qobject")).unwrap()
+            }
+       }
+    }
     pub fn create_parsed_qobject() -> ParsedQObject {
-        let qobject_struct: ForeignTypeIdentAlias = parse_quote! {
+        parse_qobject! {
             #[qobject]
             type MyObject = super::MyObjectRust;
+        }
+    }
+
+    #[test]
+    fn test_has_qobject_name() {
+        let qobject = create_parsed_qobject();
+        assert!(qobject.has_qobject_macro);
+
+        let qobject = parse_qobject! {
+            #[base=Thing]
+            type MyObject = super::MyObjectRust;
         };
-        ParsedQObject::parse(qobject_struct, None, &format_ident!("qobject")).unwrap()
+        assert!(!qobject.has_qobject_macro);
     }
 
     #[test]
     fn test_from_struct_no_base_class() {
-        let qobject_struct: ForeignTypeIdentAlias = parse_quote! {
-            #[qobject]
-            type MyObject = super::MyObjectRust;
-        };
+        let qobject = create_parsed_qobject();
 
-        let qobject =
-            ParsedQObject::parse(qobject_struct, None, &format_ident!("qobject")).unwrap();
         assert!(qobject.base_class.is_none());
         assert!(qobject.qml_metadata.is_none());
     }
 
     #[test]
     fn test_from_struct_base_class() {
-        let qobject_struct: ForeignTypeIdentAlias = parse_quote! {
+        let qobject = parse_qobject! {
             #[qobject]
-            #[base = "QStringListModel"]
+            #[base = QStringListModel]
             type MyObject = super::MyObjectRust;
         };
 
-        let qobject =
-            ParsedQObject::parse(qobject_struct, None, &format_ident!("qobject")).unwrap();
         assert_eq!(qobject.base_class.as_ref().unwrap(), "QStringListModel");
     }
 
     #[test]
     fn test_from_struct_properties_and_fields() {
-        let qobject_struct: ForeignTypeIdentAlias = parse_quote! {
+        let qobject = parse_qobject! {
             #[qobject]
             #[qproperty(i32, int_property)]
             #[qproperty(i32, public_property)]
             type MyObject = super::MyObjectRust;
         };
 
-        let qobject =
-            ParsedQObject::parse(qobject_struct, None, &format_ident!("qobject")).unwrap();
         assert_eq!(qobject.properties.len(), 2);
     }
 
     #[test]
     fn test_from_struct_fields() {
-        let qobject_struct: ForeignTypeIdentAlias = parse_quote! {
-            #[qobject]
-            type MyObject = super::MyObjectRust;
-        };
+        let qobject = create_parsed_qobject();
 
-        let qobject =
-            ParsedQObject::parse(qobject_struct, None, &format_ident!("qobject")).unwrap();
         assert_eq!(qobject.properties.len(), 0);
     }
 
     #[test]
-    fn test_parse_trait_impl_valid() {
-        let mut qobject = create_parsed_qobject();
-        let item: ItemImpl = parse_quote! {
-            impl cxx_qt::Threading for MyObject {}
-        };
-        assert!(!qobject.threading);
-        assert!(qobject.parse_trait_impl(item).is_ok());
-        assert!(qobject.threading);
-    }
-
-    #[test]
-    fn test_parse_trait_impl_invalid() {
-        let mut qobject = create_parsed_qobject();
-
-        // must be a trait
-        let item: ItemImpl = parse_quote! {
-            impl T {}
-        };
-        assert!(qobject.parse_trait_impl(item).is_err());
-
-        // no attribute allowed
-        let item: ItemImpl = parse_quote! {
-            #[attr]
-            impl cxx_qt::Threading for T {}
-        };
-        assert!(qobject.parse_trait_impl(item).is_err());
-
-        // Threading cannot be negative
-        let item: ItemImpl = parse_quote! {
-            impl !cxx_qt::Threading for T {}
-        };
-        assert!(qobject.parse_trait_impl(item).is_err());
-
-        // must be a known trait
-        let item: ItemImpl = parse_quote! {
-            #[attr]
-            impl cxx_qt::ABC for T {}
-        };
-        assert!(qobject.parse_trait_impl(item).is_err());
-    }
-
-    #[test]
     fn test_parse_struct_fields_valid() {
-        let item: ForeignTypeIdentAlias = parse_quote! {
+        let qobject = parse_qobject! {
             #[qobject]
             #[qproperty(f64, f64_property)]
             #[qproperty(f64, public_property)]
             type T = super::TRust;
         };
-        let properties = ParsedQObject::parse(item, None, &format_ident!("qobject"))
-            .unwrap()
-            .properties;
+        let properties = qobject.properties;
         assert_eq!(properties.len(), 2);
 
-        assert_eq!(properties[0].ident, "f64_property");
+        assert_eq!(properties[0].name.rust_unqualified(), "f64_property");
         assert_eq!(properties[0].ty, f64_type());
 
-        assert_eq!(properties[1].ident, "public_property");
+        assert_eq!(properties[1].name.rust_unqualified(), "public_property");
         assert_eq!(properties[1].ty, f64_type());
+    }
+
+    fn assert_qml_name(obj: ParsedQObject, str_name: &str) {
+        assert_eq!(
+            obj.qml_metadata,
+            Some(QmlElementMetadata {
+                name: str_name.to_string(),
+                uncreatable: false,
+                singleton: false,
+            })
+        );
     }
 
     #[test]
     fn test_qml_metadata() {
-        let item: ForeignTypeIdentAlias = parse_quote! {
+        let qobject = parse_qobject! {
             #[qobject]
             #[qml_element]
             type MyObject = super::MyObjectRust;
         };
-        let qobject = ParsedQObject::parse(item, None, &format_ident!("qobject")).unwrap();
-        assert_eq!(
-            qobject.qml_metadata,
-            Some(QmlElementMetadata {
-                name: "MyObject".to_string(),
-                uncreatable: false,
-                singleton: false,
-            })
-        );
+        assert_qml_name(qobject, "MyObject");
     }
 
     #[test]
     fn test_qml_metadata_named() {
-        let item: ForeignTypeIdentAlias = parse_quote! {
+        let qobject = parse_qobject! {
             #[qobject]
             #[qml_element = "OtherName"]
             type MyObject = super::MyObjectRust;
         };
+        assert_qml_name(qobject, "OtherName");
+    }
+
+    #[test]
+    fn test_qml_metadata_cxx_name() {
+        let item: ForeignTypeIdentAlias = parse_quote! {
+            #[qobject]
+            #[qml_element]
+            #[cxx_name = "RenamedObject"]
+            type MyObject = super::MyObjectRust;
+        };
         let qobject = ParsedQObject::parse(item, None, &format_ident!("qobject")).unwrap();
-        assert_eq!(
-            qobject.qml_metadata,
-            Some(QmlElementMetadata {
-                name: "OtherName".to_string(),
-                uncreatable: false,
-                singleton: false,
-            })
-        );
+        assert_qml_name(qobject, "RenamedObject");
     }
 
     #[test]
     fn test_qml_metadata_singleton() {
-        let item: ForeignTypeIdentAlias = parse_quote! {
+        let qobject = parse_qobject! {
             #[qobject]
             #[qml_element]
             #[qml_singleton]
             type MyObject = super::MyObjectRust;
         };
-        let qobject = ParsedQObject::parse(item, None, &format_ident!("qobject")).unwrap();
         assert_eq!(
             qobject.qml_metadata,
             Some(QmlElementMetadata {
@@ -405,13 +320,12 @@ pub mod tests {
 
     #[test]
     fn test_qml_metadata_uncreatable() {
-        let item: ForeignTypeIdentAlias = parse_quote! {
+        let qobject = parse_qobject! {
             #[qobject]
             #[qml_element]
             #[qml_uncreatable]
             type MyObject = super::MyObjectRust;
         };
-        let qobject = ParsedQObject::parse(item, None, &format_ident!("qobject")).unwrap();
         assert_eq!(
             qobject.qml_metadata,
             Some(QmlElementMetadata {
@@ -420,5 +334,19 @@ pub mod tests {
                 singleton: false,
             })
         );
+    }
+
+    #[test]
+    fn test_parse_errors() {
+        assert_parse_errors! {
+            |input |ParsedQObject::parse(input, None, &format_ident!("qobject")) =>
+
+            {
+                #[qobject]
+                #[base = ""]
+                type MyObject = super::T;
+            }
+            { type MyObject = super::T; }
+        }
     }
 }

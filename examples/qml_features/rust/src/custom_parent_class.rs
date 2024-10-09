@@ -6,7 +6,7 @@
 //! This example shows how a custom parent class can be used to inherit from a QQuickItem based object.
 
 /// A CXX-Qt bridge which shows a custom parent class can be used
-#[cxx_qt::bridge(cxx_file_stem = "custom_parent_class")]
+#[cxx_qt::bridge]
 pub mod qobject {
     unsafe extern "C++" {
         /// QColor from cxx_qt_lib
@@ -28,17 +28,15 @@ pub mod qobject {
 
     // Define the API from QtQuick that we need
     unsafe extern "C++" {
-        /// Define QQuickItem as a type
-        type QQuickItem;
-        include!(<QtQuick/QQuickItem>);
-
         include!(<QtQuick/QQuickPaintedItem>);
+        /// Base for Qt type
+        type QQuickPaintedItem;
     }
 
     unsafe extern "RustQt" {
         #[qobject]
         #[qml_element]
-        #[base = "QQuickPaintedItem"]
+        #[base = QQuickPaintedItem]
         #[qproperty(QColor, color)]
         type CustomParentClass = super::CustomParentClassRust;
 

@@ -5,11 +5,14 @@
 
 use crate::{
     generator::{
-        naming::{namespace::NamespaceName, qobject::QObjectNames, CombinedIdent},
+        naming::{namespace::NamespaceName, qobject::QObjectNames},
         rust::fragment::GeneratedRustFragment,
     },
-    naming::rust::{syn_type_cxx_bridge_to_qualified, syn_type_is_cxx_bridge_unsafe},
     naming::TypeNames,
+    naming::{
+        rust::{syn_type_cxx_bridge_to_qualified, syn_type_is_cxx_bridge_unsafe},
+        Name,
+    },
     parser::constructor::Constructor,
     syntax::lifetimes,
 };
@@ -93,7 +96,7 @@ fn generate_default_constructor(
 
 fn generate_arguments_struct(
     namespace_internals: &str,
-    struct_name: &CombinedIdent,
+    struct_name: &Name,
     lifetime: &Option<TokenStream>,
     argument_list: &[Type],
 ) -> Item {
@@ -103,9 +106,9 @@ fn generate_arguments_struct(
     } else {
         None
     };
-    let rust_name = &struct_name.rust;
+    let rust_name = &struct_name.rust_unqualified();
     // use to_string here, as the cxx_name needs to be in quotes for the attribute macro.
-    let cxx_name = &struct_name.cpp.to_string();
+    let cxx_name = &struct_name.cxx_unqualified();
     parse_quote! {
         #[namespace = #namespace_internals]
         #[cxx_name = #cxx_name]
@@ -176,25 +179,26 @@ fn unsafe_if(condition: bool) -> Option<TokenStream> {
 }
 
 pub fn generate(
-    constructors: &[Constructor],
-    qobject_idents: &QObjectNames,
+    constructors: &[&Constructor],
+    qobject_names: &QObjectNames,
     namespace: &NamespaceName,
     type_names: &TypeNames,
-    module_ident: &Ident,
 ) -> Result<GeneratedRustFragment> {
     if constructors.is_empty() {
-        return Ok(generate_default_constructor(qobject_idents, namespace));
+        return Ok(generate_default_constructor(qobject_names, namespace));
     }
+
+    let module_ident = qobject_names.name.require_module()?;
 
     let mut result = GeneratedRustFragment::default();
     let namespace_internals = &namespace.internal;
 
-    let qobject_name = qobject_idents.name.cxx_unqualified();
-    let qobject_name_rust = qobject_idents.name.rust_unqualified();
+    let qobject_name = qobject_names.name.cxx_unqualified();
+    let qobject_name_rust = qobject_names.name.rust_unqualified();
     let qobject_name_rust_qualified = type_names.rust_qualified(qobject_name_rust)?;
     let qobject_name_snake = qobject_name.to_string().to_case(Case::Snake);
 
-    let rust_struct_name_rust = qobject_idents.rust_struct.rust_unqualified();
+    let rust_struct_name_rust = qobject_names.rust_struct.rust_unqualified();
 
     for (index, constructor) in constructors.iter().enumerate() {
         let lifetime = constructor.lifetime.as_ref().map(|lifetime| {
@@ -230,7 +234,7 @@ pub fn generate(
         {
             return Err(Error::new_spanned(
                 &constructor.lifetime,
-                "this lifetime isn't used in the Constructor declaration!",
+                "This lifetime isn't used in the Constructor declaration!",
             ));
         }
 
@@ -275,6 +279,11 @@ pub fn generate(
             .map(|mut parameter| -> Result<_> {
                 if let FnArg::Typed(pat_type) = &mut parameter {
                     *pat_type.ty = syn_type_cxx_bridge_to_qualified(&pat_type.ty, type_names)?;
+                } else {
+                    // CODECOV_EXCLUDE_START
+                    // Unreachable as route_arguments_parameters are created with names like arg0: Type above
+                    unreachable!("Args here should not be able to be Receiver")
+                    // CODECOV_EXCLUDE_STOP
                 }
                 Ok(parameter)
             })
@@ -348,18 +357,9 @@ pub fn generate(
                     initialize: #initialize_arguments_rust #initialize_lifetime,
                 }
             },
-            generate_arguments_struct(&namespace.internal, &CombinedIdent {
-                cpp: base_arguments_cxx.clone(),
-                rust: base_arguments_rust.clone(),
-            }, &base_lifetime, &constructor.base_arguments),
-            generate_arguments_struct(&namespace.internal, &CombinedIdent {
-                cpp: new_arguments_cxx.clone(),
-                rust: new_arguments_rust.clone(),
-            }, &new_lifetime, &constructor.new_arguments),
-            generate_arguments_struct(&namespace.internal, &CombinedIdent {
-                cpp: initialize_arguments_cxx.clone(),
-                rust: initialize_arguments_rust.clone(),
-            }, &initialize_lifetime, &constructor.initialize_arguments),
+            generate_arguments_struct(&namespace.internal, &Name::new(base_arguments_rust.clone()).with_cxx_name(base_arguments_cxx.to_string()), &base_lifetime, &constructor.base_arguments),
+            generate_arguments_struct(&namespace.internal, &Name::new(new_arguments_rust.clone()).with_cxx_name(new_arguments_cxx.to_string()), &new_lifetime, &constructor.new_arguments),
+            generate_arguments_struct(&namespace.internal, &Name::new(initialize_arguments_rust.clone()).with_cxx_name(initialize_arguments_cxx.to_string()), &initialize_lifetime, &constructor.initialize_arguments),
             parse_quote_spanned! {
                 constructor.imp.span() =>
                 #[allow(clippy::needless_lifetimes)]
@@ -464,19 +464,12 @@ mod tests {
         NamespaceName::from_namespace_and_ident("qobject", &format_ident!("MyObject"))
     }
 
-    fn generate_mocked(constructors: &[Constructor]) -> GeneratedRustFragment {
+    fn generate_mocked(constructors: &[&Constructor]) -> GeneratedRustFragment {
         let mut type_names = TypeNames::mock();
 
         type_names.mock_insert("QString", None, None, None);
         type_names.mock_insert("QObject", None, None, None);
-        generate(
-            constructors,
-            &mock_name(),
-            &mock_namespace(),
-            &type_names,
-            &format_ident!("qobject"),
-        )
-        .unwrap()
+        generate(constructors, &mock_name(), &mock_namespace(), &type_names).unwrap()
     }
 
     #[test]
@@ -769,8 +762,8 @@ mod tests {
     #[test]
     fn multiple_constructors() {
         let blocks = generate_mocked(&[
-            mock_constructor(),
-            Constructor {
+            &mock_constructor(),
+            &Constructor {
                 arguments: vec![parse_quote! { *const QObject }],
                 new_arguments: vec![parse_quote! { i16 }],
                 initialize_arguments: vec![
@@ -801,17 +794,15 @@ mod tests {
 
     #[test]
     fn constructor_impl_with_unused_lifetime() {
-        let result = super::generate(
-            &[Constructor {
+        assert!(generate(
+            &[&Constructor {
                 lifetime: Some(parse_quote! { 'a }),
                 ..mock_constructor()
             }],
             &mock_name(),
             &mock_namespace(),
-            &TypeNames::default(),
-            &format_ident!("ffi"),
-        );
-
-        assert!(result.is_err());
+            &TypeNames::mock(),
+        )
+        .is_err());
     }
 }

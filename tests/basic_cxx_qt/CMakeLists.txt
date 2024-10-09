@@ -27,11 +27,23 @@ if(NOT USE_QT5)
     find_package(Qt6 COMPONENTS Core Gui Qml Test)
 endif()
 if(NOT Qt6_FOUND)
-    find_package(Qt5 5.15 COMPONENTS Core Gui Qml Test REQUIRED)
+    find_package(Qt5 5.15 COMPONENTS Core Gui Qml Test QuickControls2 REQUIRED)
+endif()
+
+find_package(CxxQt QUIET)
+if(NOT CxxQt_FOUND)
+    include(FetchContent)
+    FetchContent_Declare(
+        CxxQt
+        GIT_REPOSITORY https://github.com/kdab/cxx-qt-cmake.git
+        GIT_TAG main
+    )
+
+    FetchContent_MakeAvailable(CxxQt)
 endif()
 
 set(CRATE basic_cxx_qt)
-cxxqt_import_crate(MANIFEST_PATH rust/Cargo.toml CRATES ${CRATE})
+cxx_qt_import_crate(MANIFEST_PATH rust/Cargo.toml CRATES ${CRATE})
 
 add_executable(${APP_NAME} cpp/main.cpp)
 target_link_libraries(${APP_NAME} PRIVATE

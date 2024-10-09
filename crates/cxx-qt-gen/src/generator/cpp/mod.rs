@@ -8,7 +8,6 @@ pub mod cxxqttype;
 pub mod externcxxqt;
 pub mod fragment;
 pub mod inherit;
-pub mod locking;
 pub mod method;
 pub mod property;
 pub mod qenum;
@@ -17,12 +16,17 @@ pub mod qobject;
 pub mod signal;
 pub mod threading;
 
+mod utils;
+
 use std::collections::BTreeSet;
 
+use crate::generator::cpp::fragment::CppNamedType;
+use crate::naming::cpp::syn_type_to_cpp_type;
+use crate::naming::TypeNames;
 use crate::{generator::structuring, parser::Parser};
 use externcxxqt::GeneratedCppExternCxxQtBlocks;
 use qobject::GeneratedCppQObject;
-use syn::Result;
+use syn::{FnArg, ForeignItemFn, Pat, PatIdent, PatType, Result};
 
 /// Representation of the generated C++ code for a group of QObjects
 pub struct GeneratedCppBlocks {
@@ -30,8 +34,6 @@ pub struct GeneratedCppBlocks {
     pub forward_declares: Vec<String>,
     /// Additional includes for the CXX bridge
     pub includes: BTreeSet<String>,
-    /// Stem of the CXX header to include
-    pub cxx_file_stem: String,
     /// Generated QObjects
     pub qobjects: Vec<GeneratedCppQObject>,
     /// Generated extern C++Qt blocks
@@ -61,7 +63,6 @@ impl GeneratedCppBlocks {
         Ok(GeneratedCppBlocks {
             forward_declares,
             includes,
-            cxx_file_stem: parser.cxx_file_stem.clone(),
             qobjects: structures
                 .qobjects
                 .iter()
@@ -75,7 +76,34 @@ impl GeneratedCppBlocks {
     }
 }
 
-mod utils;
+/// Returns a vector of the names and types ([CppNamedType] of the parameters of this method, used in cpp generation step
+pub fn get_cpp_params(method: &ForeignItemFn, type_names: &TypeNames) -> Result<Vec<CppNamedType>> {
+    method
+        .sig
+        .inputs
+        .iter()
+        .map(|input| {
+            // Match parameters to extract their idents
+            if let FnArg::Typed(PatType { pat, ty, .. }) = input {
+                let ident = if let Pat::Ident(PatIdent { ident, .. }) = &**pat {
+                    ident
+                } else {
+                    // CODECOV_EXCLUDE_START
+                    unreachable!("Unknown pattern for type, FnArg can only have Pat::Ident")
+                    // CODECOV_EXCLUDE_STOP
+                };
+
+                Ok(Some(CppNamedType {
+                    ident: ident.to_string(),
+                    ty: syn_type_to_cpp_type(ty, type_names)?,
+                }))
+            } else {
+                Ok(None)
+            }
+        })
+        .filter_map(|result| result.map_or_else(|e| Some(Err(e)), |v| v.map(Ok)))
+        .collect()
+}
 
 #[cfg(test)]
 mod tests {
@@ -98,26 +126,6 @@ mod tests {
         let parser = Parser::from(module).unwrap();
 
         let cpp = GeneratedCppBlocks::from(&parser).unwrap();
-        assert_eq!(cpp.cxx_file_stem, "ffi");
-        assert_eq!(cpp.qobjects.len(), 1);
-        assert_eq!(cpp.qobjects[0].name.namespace(), None);
-    }
-
-    #[test]
-    fn test_generated_cpp_blocks_cxx_file_stem() {
-        let module: ItemMod = parse_quote! {
-            #[cxx_qt::bridge(cxx_file_stem = "my_object")]
-            mod ffi {
-                extern "RustQt" {
-                    #[qobject]
-                    type MyObject = super::MyObjectRust;
-                }
-            }
-        };
-        let parser = Parser::from(module).unwrap();
-
-        let cpp = GeneratedCppBlocks::from(&parser).unwrap();
-        assert_eq!(cpp.cxx_file_stem, "my_object");
         assert_eq!(cpp.qobjects.len(), 1);
         assert_eq!(cpp.qobjects[0].name.namespace(), None);
     }

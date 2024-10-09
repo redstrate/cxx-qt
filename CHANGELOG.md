@@ -19,13 +19,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Support for further types: `QLine`, `QLineF`, `QImage`, `QPainter`, `QFont`, `QPen`, `QPolygon`, `QPolygonF`, `QRegion`
+- Support for further types: `QLine`, `QLineF`, `QImage`, `QPainter`, `QFont`, `QPen`, `QPolygon`, `QPolygonF`, `QRegion`, `QAnyStringView`
 - `internal_pointer_mut()` function on `QModelIndex`
 - `c_void` in CXX-Qt-lib for easy access to `void *`
 - `CxxQtThread` is now marked as `Sync` so that it can be used by reference
 - Add cxx-qt-lib-extras crate which contains: `QCommandLineOption`, `QCommandLineParser`, `QElapsedTimer`, `QApplication`
 - Serde support for `QString` (requires "serde" feature on cxx-qt-lib)
 - A new QuickControls module, which exposes `QQuickStyle`. This module is enabled by default and is behind the `qt_quickcontrols` feature.
+- Add support for specifying read write and notify in qproperty macro, including support for custom user defined functions
+- Add support for the constant, required, reset and final flags in the qproperty macro
+- QObject subclasses can now inherit from other CXX-Qt generated QObject classes
+- `BUILD_WASM` CMake option to support WebAssembly builds and a book page for building for WASM
+- Add support for cxx_name and rust_name on qproperty attributes which applies to the QProperty generated as well as functions
 
 ### Changed
 
@@ -38,10 +43,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `#[qobject]` attribute is now optional on types in `extern "RustQt"`
 - `#[qobject]` attribute is now required on types in `extern "C++Qt"`
 - `#[qenum]`s now resolve their namespace independently from their associated QObject
+- Reworked cxx-qt-build and the integration with CMake
+  - Dependencies are now automatically detected and configured by cxx-qt-build
+  - Libraries can pass build information to cxx-qt-build in the form of a `cxx_qt_build::Interface`
+  - Add CMake wrappers around corrosion to simplify importing crates and qml modules that were built with cxx-qt-build
+  - CMake code has been extracted into a separate repository for faster downloads (kdab/cxx-qt-cmake)
+- Folder structure of Rust bridges is now considered in the same way as CXX in `CxxQtBuilder`
+- `cxx_file_stem` has been removed from `#[cxx_qt::bridge]` and the source file name is now used for generated headers similar to CXX
+- Base attribute now takes an ident not a string, e.g. `#[base = ParentClass]` instead of `#[base = "ParentClass"]`
+- No Cxx-qt-lib features are on by default now, instead we have a 'full' feature for the previously enabled features, making them opt in
 
 ### Removed
 
 - `qt_gui` and `qt_qml` features from `cxx-qt-build` they are only used in `cxx-qt-lib(-headers)` now
+- `cxx-qt-lib-headers` and `cxx-qt-lib-extras-headers` are now merged into their respective base crates
+- `BuildOpts` are replaced by the `Interface` type which does not need to be reiterated by downstream dependencies
+- Locking has been removed from the generated QObjects. Qt/User C++ code is responsible for upholding Rusts Safety guarantees.
+  - The `cxx_qt::Locking` trait is no longer available.
 
 ## [0.6.1](https://github.com/KDAB/cxx-qt/compare/v0.6.0...v0.6.1) - 2024-04-19
 

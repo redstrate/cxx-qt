@@ -3,10 +3,9 @@
 //
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
+use crate::{naming::Name, parser::require_attributes, syntax::path::path_compare_str};
 use quote::ToTokens;
 use syn::{Ident, ItemEnum, Result, Variant};
-
-use crate::{naming::Name, syntax::path::path_compare_str};
 
 pub struct ParsedQEnum {
     /// The name of the QObject
@@ -20,6 +19,7 @@ pub struct ParsedQEnum {
 }
 
 impl ParsedQEnum {
+    const ALLOWED_ATTRS: [&'static str; 5] = ["doc", "cxx_name", "rust_name", "namespace", "qenum"];
     fn parse_variant(variant: &Variant) -> Result<Ident> {
         fn err(spanned: &impl ToTokens, message: &str) -> Result<Ident> {
             Err(syn::Error::new_spanned(spanned, message))
@@ -54,10 +54,11 @@ impl ParsedQEnum {
         parent_namespace: Option<&str>,
         module: &Ident,
     ) -> Result<Self> {
+        require_attributes(&qenum.attrs, &Self::ALLOWED_ATTRS)?;
         if qenum.variants.is_empty() {
             return Err(syn::Error::new_spanned(
                 qenum,
-                "QEnum must have at least one variant",
+                "QEnum must have at least one variant!",
             ));
         }
 
@@ -68,17 +69,6 @@ impl ParsedQEnum {
             return Err(syn::Error::new_spanned(
                 qenum.ident,
                 "A QEnum must either be namespaced or associated to a QObject!",
-            ));
-        }
-
-        if let Some(attr) = qenum.attrs.iter().find(|attr| {
-            !["doc", "namespace", "cxx_name", "rust_name"]
-                .iter()
-                .any(|allowed_attr| path_compare_str(attr.path(), &[allowed_attr]))
-        }) {
-            return Err(syn::Error::new_spanned(
-                attr,
-                "Additional attributes are not allowed on #[qenum] enums",
             ));
         }
 
@@ -159,53 +149,48 @@ mod tests {
         assert_tokens_eq(&parsed.item, qenum.to_token_stream());
     }
 
-    macro_rules! assert_parse_error {
-        ($( $input:tt )*) => {
-            let qenum: ItemEnum = parse_quote! { $($input)* };
-            assert!(ParsedQEnum::parse(qenum, Some(format_ident!("QObject")), None, &mock_module()).is_err());
-        }
-    }
+    use crate::tests::assert_parse_errors;
 
     #[test]
     fn parse_errors() {
-        assert_parse_error! {
+        assert_parse_errors! {
+            |qenum| ParsedQEnum::parse(qenum, Some(format_ident!("QObject")), None, &mock_module()) =>
             // No variants
-            enum MyEnum {}
-        }
-        assert_parse_error! {
-            // Unkown attributes
-            #[any_attribute]
-            enum MyEnum { A }
-        }
-        assert_parse_error! {
-            // Repr is not allowed either
-            #[repr(u32)]
-            enum MyEnum { A }
-        }
-        assert_parse_error! {
-            // Fields are not allowed
-            enum MyEnum {
-                A { field: i32 }
-            }
-        }
-        assert_parse_error! {
-            // Fields are not allowed
-            enum MyEnum {
-                A(i32)
-            }
-        }
-        assert_parse_error! {
-            // Attributes on variants are not allowed
-            enum MyEnum {
+            { enum MyEnum {} }
+            {
+                // Unknown attributes
                 #[any_attribute]
-                A
+                enum MyEnum { A }
             }
-        }
-
-        // TODO: allow discriminants
-        assert_parse_error! {
-            enum MyEnum {
-                A = 1
+            {
+                // Repr is not allowed either
+                #[repr(u32)]
+                enum MyEnum { A }
+            }
+            {
+                // Fields are not allowed
+                enum MyEnum {
+                    A { field: i32 }
+                }
+            }
+            {
+                // Fields are not allowed
+                enum MyEnum {
+                    A(i32)
+                }
+            }
+            {
+                // Attributes on variants are not allowed
+                enum MyEnum {
+                    #[any_attribute]
+                    A
+                }
+            }
+            {
+                // TODO: Allow discriminants
+                enum MyEnum {
+                    A = 1
+                }
             }
         }
     }

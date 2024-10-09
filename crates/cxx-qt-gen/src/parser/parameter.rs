@@ -27,10 +27,6 @@ impl ParsedFunctionParameter {
                 FnArg::Typed(type_pattern) => {
                     let parameter = ParsedFunctionParameter::parse(type_pattern)?;
 
-                    // Ignore self as a parameter
-                    if parameter.ident == "self" {
-                        return Ok(None);
-                    }
                     Ok(Some(parameter))
                 }
                 // Ignore self as a parameter
@@ -47,7 +43,10 @@ impl ParsedFunctionParameter {
         let mut iter = signature.inputs.iter();
         // whilst we can ignore the receiver argument, make sure it actually exists
         if iter.next().is_none() {
-            return Err(Error::new_spanned(signature, "Missing receiver argument!"));
+            return Err(Error::new_spanned(
+                signature,
+                "Missing self receiver argument!",
+            ));
         }
 
         Self::parse_remaining(iter)
@@ -62,9 +61,7 @@ impl ParsedFunctionParameter {
         let missing_self_arg = "First argument must be a supported `self` receiver type!\nUse `&self` or `self: Pin<&mut Self>` instead.";
         match iter.next() {
             Some(FnArg::Receiver(Receiver {
-                reference: None,
-                ty,
-                ..
+                reference: _, ty, ..
             })) if types::is_pin_of_self(ty) => Ok(()), // Okay, found a Pin<&Self> or Pin<&mut Self>
             Some(FnArg::Receiver(Receiver {
                 reference: Some(_), // `self` needs to be by-ref, by-value is not supported.
@@ -85,7 +82,7 @@ impl ParsedFunctionParameter {
         } else {
             return Err(Error::new(
                 type_pattern.span(),
-                "Invalid argument ident format.",
+                "Invalid argument ident format!\nPlease specify like `arg: Ty`",
             ));
         };
 
@@ -98,10 +95,42 @@ impl ParsedFunctionParameter {
 
 #[cfg(test)]
 mod tests {
-    use quote::ToTokens;
-    use syn::ForeignItemFn;
-
     use super::*;
+    use crate::tests::assert_parse_errors;
+    use quote::ToTokens;
+    use syn::{parse_quote, ForeignItemFn};
+    #[test]
+    fn test_parse_invalid() {
+        assert_parse_errors! {
+            |function: ForeignItemFn| ParsedFunctionParameter::parse_all_without_receiver(&function.sig) =>
+
+            // Missing self
+            { fn foo(a: i32, b: String); }
+            // self parameter points to non-self type
+            { fn foo(self: T); }
+            // self parameter is a non-self pin
+            { fn foo(self: Pin<&mut T>); }
+            // missing receiver type
+            { fn foo(); }
+        }
+    }
+
+    #[test]
+    fn test_parse_remove_receiver() {
+        let function: ForeignItemFn = syn::parse_quote! {
+            fn foo(self: Pin<&mut Self>);
+        };
+
+        let parameters =
+            ParsedFunctionParameter::parse_remaining(function.sig.inputs.iter()).unwrap();
+        assert_eq!(parameters.len(), 0)
+    }
+
+    #[test]
+    fn test_parse_non_ident_type_pat() {
+        let type_pattern: PatType = parse_quote!( (a, b): (i32, i32) );
+        assert!(ParsedFunctionParameter::parse(&type_pattern).is_err())
+    }
 
     #[test]
     fn test_parse_all_without_receiver() {
@@ -119,25 +148,6 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_all_without_receiver_invalid_self() {
-        fn assert_parse_error(function: ForeignItemFn) {
-            assert!(ParsedFunctionParameter::parse_all_without_receiver(&function.sig).is_err());
-        }
-        // Missing self
-        assert_parse_error(syn::parse_quote! {
-            fn foo(a: i32, b: String);
-        });
-        // self parameter points to non-self type
-        assert_parse_error(syn::parse_quote! {
-            fn foo(self: T);
-        });
-        // self parameter is a non-self pin
-        assert_parse_error(syn::parse_quote! {
-            fn foo(self: Pin<&mut T>);
-        })
-    }
-
-    #[test]
     fn test_parse_all_ignoring_receiver() {
         // This supports using a type as `self` that's not "Self".
         let function: ForeignItemFn = syn::parse_quote! {
@@ -151,5 +161,15 @@ mod tests {
         assert_eq!(parameters[0].ty.to_token_stream().to_string(), "i32");
         assert_eq!(parameters[1].ident, "b");
         assert_eq!(parameters[1].ty.to_token_stream().to_string(), "String");
+    }
+
+    #[test]
+    fn test_parse_all_ignoring_receiver_invalid() {
+        // missing receiver type
+        let function: ForeignItemFn = syn::parse_quote! {
+            fn foo();
+        };
+
+        assert!(ParsedFunctionParameter::parse_all_ignoring_receiver(&function.sig).is_err())
     }
 }

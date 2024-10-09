@@ -2,13 +2,14 @@
 // SPDX-FileContributor: Andrew Hayzen <andrew.hayzen@kdab.com>
 //
 // SPDX-License-Identifier: MIT OR Apache-2.0
-
 use crate::{
-    parser::parameter::ParsedFunctionParameter,
-    syntax::{attribute::attribute_take_path, foreignmod, safety::Safety, types},
+    naming::Name,
+    parser::{check_safety, parameter::ParsedFunctionParameter, require_attributes},
+    syntax::{foreignmod, safety::Safety, types},
 };
-use std::collections::HashSet;
-use syn::{spanned::Spanned, Error, ForeignItemFn, Ident, Result};
+use core::ops::Deref;
+use std::collections::{BTreeMap, HashSet};
+use syn::{Attribute, ForeignItemFn, Ident, Result};
 
 /// Describes a C++ specifier for the Q_INVOKABLE
 #[derive(Eq, Hash, PartialEq)]
@@ -19,74 +20,141 @@ pub enum ParsedQInvokableSpecifiers {
 }
 
 impl ParsedQInvokableSpecifiers {
-    fn as_str_slice(&self) -> &[&str] {
+    fn as_str(&self) -> &str {
         match self {
-            ParsedQInvokableSpecifiers::Final => &["cxx_final"],
-            ParsedQInvokableSpecifiers::Override => &["cxx_override"],
-            ParsedQInvokableSpecifiers::Virtual => &["cxx_virtual"],
+            ParsedQInvokableSpecifiers::Final => "cxx_final",
+            ParsedQInvokableSpecifiers::Override => "cxx_override",
+            ParsedQInvokableSpecifiers::Virtual => "cxx_virtual",
         }
     }
-}
 
-/// Describes a single method (which could be a Q_INVOKABLE) for a struct
-pub struct ParsedMethod {
-    /// The original [syn::ImplItemFn] of the invokable
-    pub method: ForeignItemFn,
-    /// The type of the self argument
-    pub qobject_ident: Ident,
-    /// Whether this invokable is mutable
-    pub mutable: bool,
-    /// Whether the method is safe to call.
-    pub safe: bool,
-    /// The parameters of the invokable
-    pub parameters: Vec<ParsedFunctionParameter>,
-    /// Any specifiers that declared on the invokable
-    pub specifiers: HashSet<ParsedQInvokableSpecifiers>,
-    /// Whether the method is qinvokable
-    pub is_qinvokable: bool,
-}
-
-impl ParsedMethod {
-    pub fn parse(mut method: ForeignItemFn, safety: Safety) -> Result<Self> {
-        if safety == Safety::Unsafe && method.sig.unsafety.is_none() {
-            return Err(Error::new(
-                method.span(),
-                "Invokable methods must be marked as unsafe or wrapped in an `unsafe extern \"RustQt\"` block!",
-            ));
-        }
-
-        // Determine if the method is invokable
-        let is_qinvokable = attribute_take_path(&mut method.attrs, &["qinvokable"]).is_some();
-
-        // Parse any C++ specifiers
-        let mut specifiers = HashSet::new();
+    fn from_attrs(attrs: BTreeMap<&str, &Attribute>) -> HashSet<ParsedQInvokableSpecifiers> {
+        let mut output = HashSet::new();
         for specifier in [
             ParsedQInvokableSpecifiers::Final,
             ParsedQInvokableSpecifiers::Override,
             ParsedQInvokableSpecifiers::Virtual,
         ] {
-            if attribute_take_path(&mut method.attrs, specifier.as_str_slice()).is_some() {
-                specifiers.insert(specifier);
+            if attrs.contains_key(specifier.as_str()) {
+                output.insert(specifier);
             }
         }
+        output
+    }
+}
 
-        // Determine if the invokable is mutable
+/// Describes a single method (which could be a Q_INVOKABLE) for a struct
+pub struct ParsedMethod {
+    /// The common fields which are available on all callable types
+    pub method_fields: MethodFields,
+    /// Any specifiers that declared on the invokable
+    pub specifiers: HashSet<ParsedQInvokableSpecifiers>,
+    /// Whether the method is qinvokable
+    pub is_qinvokable: bool,
+    // No docs field since the docs should be on the method implementation outside the bridge
+    // This means any docs on the bridge declaration would be ignored
+}
+
+impl ParsedMethod {
+    const ALLOWED_ATTRS: [&'static str; 7] = [
+        "cxx_name",
+        "rust_name",
+        "qinvokable",
+        "cxx_final",
+        "cxx_override",
+        "cxx_virtual",
+        "doc",
+    ];
+
+    #[cfg(test)]
+    pub fn mock_qinvokable(method: &ForeignItemFn) -> Self {
+        Self {
+            is_qinvokable: true,
+            ..Self::parse(method.clone(), Safety::Safe).unwrap()
+        }
+    }
+
+    #[cfg(test)]
+    pub fn make_mutable(self) -> Self {
+        Self {
+            method_fields: MethodFields {
+                mutable: true,
+                ..self.method_fields
+            },
+            ..self
+        }
+    }
+
+    #[cfg(test)]
+    pub fn make_unsafe(self) -> Self {
+        Self {
+            method_fields: MethodFields {
+                safe: false,
+                ..self.method_fields
+            },
+            ..self
+        }
+    }
+
+    #[cfg(test)]
+    pub fn with_specifiers(self, specifiers: HashSet<ParsedQInvokableSpecifiers>) -> Self {
+        Self { specifiers, ..self }
+    }
+
+    pub fn parse(method: ForeignItemFn, safety: Safety) -> Result<Self> {
+        check_safety(&method, &safety)?;
+        let fields = MethodFields::parse(method)?;
+        let attrs = require_attributes(&fields.method.attrs, &Self::ALLOWED_ATTRS)?;
+
+        // Determine if the method is invokable
+        let is_qinvokable = attrs.contains_key("qinvokable");
+        let specifiers = ParsedQInvokableSpecifiers::from_attrs(attrs);
+
+        Ok(Self {
+            method_fields: fields,
+            specifiers,
+            is_qinvokable,
+        })
+    }
+}
+
+impl Deref for ParsedMethod {
+    type Target = MethodFields;
+
+    fn deref(&self) -> &Self::Target {
+        &self.method_fields
+    }
+}
+
+/// Struct with common fields between Invokable types.
+/// These types are ParsedSignal, ParsedMethod and ParsedInheritedMethod
+#[derive(Clone)]
+pub struct MethodFields {
+    pub method: ForeignItemFn,
+    pub qobject_ident: Ident,
+    pub mutable: bool,
+    pub parameters: Vec<ParsedFunctionParameter>,
+    pub safe: bool,
+    pub name: Name,
+}
+
+impl MethodFields {
+    pub fn parse(method: ForeignItemFn) -> Result<Self> {
         let self_receiver = foreignmod::self_type_from_foreign_fn(&method.sig)?;
         let (qobject_ident, mutability) = types::extract_qobject_ident(&self_receiver.ty)?;
         let mutable = mutability.is_some();
 
         let parameters = ParsedFunctionParameter::parse_all_ignoring_receiver(&method.sig)?;
-
         let safe = method.sig.unsafety.is_none();
+        let name = Name::from_rust_ident_and_attrs(&method.sig.ident, &method.attrs, None, None)?;
 
-        Ok(ParsedMethod {
+        Ok(MethodFields {
             method,
             qobject_ident,
             mutable,
             parameters,
-            specifiers,
             safe,
-            is_qinvokable,
+            name,
         })
     }
 }

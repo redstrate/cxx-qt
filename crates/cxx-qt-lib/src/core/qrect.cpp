@@ -7,7 +7,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 #include "cxx-qt-lib/qrect.h"
 
-#include "../assertion_utils.h"
+#include <cxx-qt-lib/assertion_utils.h>
 
 #include <cstdint>
 
@@ -16,9 +16,12 @@
 // https://code.qt.io/cgit/qt/qtbase.git/tree/src/corelib/tools/qrect.h?h=v5.15.6-lts-lgpl#n161
 //
 // https://code.qt.io/cgit/qt/qtbase.git/tree/src/corelib/tools/qrect.h?h=v6.2.4#n161
-assert_alignment_and_size(QRect,
-                          alignof(::std::int32_t),
-                          sizeof(::std::int32_t[4]));
+assert_alignment_and_size(QRect, {
+  ::std::int32_t a0;
+  ::std::int32_t a1;
+  ::std::int32_t a2;
+  ::std::int32_t a3;
+});
 
 static_assert(::std::is_trivially_copyable<QRect>::value,
               "QRect must be trivially copyable");

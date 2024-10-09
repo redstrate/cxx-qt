@@ -1,7 +1,5 @@
 #pragma once
 
-#include <cxx-qt/locking.h>
-#include <cxx-qt/maybelockguard.h>
 #include <cxx-qt/signalhandler.h>
 #include <cxx-qt/type.h>
 
@@ -21,7 +19,30 @@ using MyObjectCxxQtSignalHandlertrivialChanged = ::rust::cxxqt1::SignalHandler<
   struct MyObjectCxxQtSignalParamstrivialChanged*>;
 } // namespace cxx_qt::my_object::rust::cxxqtgen1
 
-#include "cxx-qt-gen/ffi.cxx.h"
+namespace cxx_qt::my_object::rust::cxxqtgen1 {
+using MyObjectCxxQtSignalHandlercustomFunctionPropChanged =
+  ::rust::cxxqt1::SignalHandler<
+    struct MyObjectCxxQtSignalParamscustomFunctionPropChanged*>;
+} // namespace cxx_qt::my_object::rust::cxxqtgen1
+
+namespace cxx_qt::my_object::rust::cxxqtgen1 {
+using MyObjectCxxQtSignalHandlerrenamedPropertyChanged =
+  ::rust::cxxqt1::SignalHandler<
+    struct MyObjectCxxQtSignalParamsrenamedPropertyChanged*>;
+} // namespace cxx_qt::my_object::rust::cxxqtgen1
+
+namespace cxx_qt::my_object::rust::cxxqtgen1 {
+using MyObjectCxxQtSignalHandlernamed_prop_2Changed =
+  ::rust::cxxqt1::SignalHandler<
+    struct MyObjectCxxQtSignalParamsnamed_prop_2Changed*>;
+} // namespace cxx_qt::my_object::rust::cxxqtgen1
+
+namespace cxx_qt::my_object::rust::cxxqtgen1 {
+using MyObjectCxxQtSignalHandlermyOnChanged =
+  ::rust::cxxqt1::SignalHandler<struct MyObjectCxxQtSignalParamsmyOnChanged*>;
+} // namespace cxx_qt::my_object::rust::cxxqtgen1
+
+#include "directory/file_ident.cxx.h"
 
 namespace cxx_qt::my_object::rust::cxxqtgen1 {
 ::QMetaObject::Connection
@@ -41,11 +62,46 @@ MyObject_trivialChangedConnect(
   ::Qt::ConnectionType type);
 } // namespace cxx_qt::my_object::rust::cxxqtgen1
 
+namespace cxx_qt::my_object::rust::cxxqtgen1 {
+::QMetaObject::Connection
+MyObject_customFunctionPropChangedConnect(
+  cxx_qt::my_object::MyObject& self,
+  ::cxx_qt::my_object::rust::cxxqtgen1::
+    MyObjectCxxQtSignalHandlercustomFunctionPropChanged closure,
+  ::Qt::ConnectionType type);
+} // namespace cxx_qt::my_object::rust::cxxqtgen1
+
+namespace cxx_qt::my_object::rust::cxxqtgen1 {
+::QMetaObject::Connection
+MyObject_renamedPropertyChangedConnect(
+  cxx_qt::my_object::MyObject& self,
+  ::cxx_qt::my_object::rust::cxxqtgen1::
+    MyObjectCxxQtSignalHandlerrenamedPropertyChanged closure,
+  ::Qt::ConnectionType type);
+} // namespace cxx_qt::my_object::rust::cxxqtgen1
+
+namespace cxx_qt::my_object::rust::cxxqtgen1 {
+::QMetaObject::Connection
+MyObject_named_prop_2ChangedConnect(
+  cxx_qt::my_object::MyObject& self,
+  ::cxx_qt::my_object::rust::cxxqtgen1::
+    MyObjectCxxQtSignalHandlernamed_prop_2Changed closure,
+  ::Qt::ConnectionType type);
+} // namespace cxx_qt::my_object::rust::cxxqtgen1
+
+namespace cxx_qt::my_object::rust::cxxqtgen1 {
+::QMetaObject::Connection
+MyObject_myOnChangedConnect(
+  cxx_qt::my_object::MyObject& self,
+  ::cxx_qt::my_object::rust::cxxqtgen1::MyObjectCxxQtSignalHandlermyOnChanged
+    closure,
+  ::Qt::ConnectionType type);
+} // namespace cxx_qt::my_object::rust::cxxqtgen1
+
 namespace cxx_qt::my_object {
 class MyObject
   : public QObject
   , public ::rust::cxxqt1::CxxQtType<MyObjectRust>
-  , public ::rust::cxxqt1::CxxQtLocking
 {
   Q_OBJECT
 public:
@@ -53,23 +109,54 @@ public:
                NOTIFY primitiveChanged)
   Q_PROPERTY(
     QPoint trivial READ getTrivial WRITE setTrivial NOTIFY trivialChanged)
+  Q_PROPERTY(::std::int32_t customFunctionProp READ myGetter WRITE
+               MyCustomSetter NOTIFY customFunctionPropChanged)
+  Q_PROPERTY(::std::int32_t readonlyProp READ getReadonlyProp)
+  Q_PROPERTY(::std::int32_t renamedProperty READ getRenamedProperty WRITE
+               setRenamedProperty NOTIFY renamedPropertyChanged)
+  Q_PROPERTY(::std::int32_t named_prop_2 READ getNamedProp2 WRITE setNamedProp2
+               NOTIFY named_prop_2Changed)
+  Q_PROPERTY(::std::int32_t customOnChangedProp READ getCustomOnChangedProp
+               WRITE setCustomOnChangedProp NOTIFY myOnChanged)
+  Q_PROPERTY(::std::int32_t constProp READ getConstProp CONSTANT)
+  Q_PROPERTY(::std::int32_t resettableProp READ getResettableProp WRITE
+               setResettableProp RESET myResetFn)
+  Q_PROPERTY(::std::int32_t requiredProp READ getRequiredProp WRITE
+               setRequiredProp REQUIRED)
+  Q_PROPERTY(
+    ::std::int32_t finalProp READ getFinalProp WRITE setFinalProp FINAL)
 
   virtual ~MyObject() = default;
 
 public:
-  ::std::int32_t const& getPrimitive() const;
-  Q_SLOT void setPrimitive(::std::int32_t const& value);
-  QPoint const& getTrivial() const;
-  Q_SLOT void setTrivial(QPoint const& value);
+  ::std::int32_t const& getPrimitive() const noexcept;
+  Q_SLOT void setPrimitive(::std::int32_t value) noexcept;
+  QPoint const& getTrivial() const noexcept;
+  Q_SLOT void setTrivial(QPoint value) noexcept;
+  ::std::int32_t const& getReadonlyProp() const noexcept;
+  ::std::int32_t const& getRenamedProperty() const noexcept;
+  Q_SLOT void setRenamedProperty(::std::int32_t value) noexcept;
+  ::std::int32_t const& getNamedProp2() const noexcept;
+  Q_SLOT void setNamedProp2(::std::int32_t value) noexcept;
+  ::std::int32_t const& getCustomOnChangedProp() const noexcept;
+  Q_SLOT void setCustomOnChangedProp(::std::int32_t value) noexcept;
+  ::std::int32_t const& getConstProp() const noexcept;
+  ::std::int32_t const& getResettableProp() const noexcept;
+  Q_SLOT void setResettableProp(::std::int32_t value) noexcept;
+  ::std::int32_t const& getRequiredProp() const noexcept;
+  Q_SLOT void setRequiredProp(::std::int32_t value) noexcept;
+  ::std::int32_t const& getFinalProp() const noexcept;
+  Q_SLOT void setFinalProp(::std::int32_t value) noexcept;
   Q_SIGNAL void primitiveChanged();
   Q_SIGNAL void trivialChanged();
+  Q_SIGNAL void customFunctionPropChanged();
+  Q_SIGNAL void renamedPropertyChanged();
+  Q_SIGNAL void named_prop_2Changed();
+  ::std::int32_t myGetter() const noexcept;
+  void MyCustomSetter(::std::int32_t value) noexcept;
+  void myResetFn() noexcept;
+  Q_SIGNAL void myOnChanged();
   explicit MyObject(QObject* parent = nullptr);
-
-private:
-  ::std::int32_t const& getPrimitiveWrapper() const noexcept;
-  void setPrimitiveWrapper(::std::int32_t value) noexcept;
-  QPoint const& getTrivialWrapper() const noexcept;
-  void setTrivialWrapper(QPoint value) noexcept;
 };
 
 static_assert(::std::is_base_of<QObject, MyObject>::value,

@@ -6,14 +6,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 #include "cxx-qt-lib/qpersistentmodelindex.h"
 
-#include "../assertion_utils.h"
+#include <cxx-qt-lib/assertion_utils.h>
 
 // QPersistentModelIndex is a single pointer to a QPersistentModelIndexData
 // https://code.qt.io/cgit/qt/qtbase.git/tree/src/corelib/itemmodels/qabstractitemmodel.h?h=v5.15.6-lts-lgpl#n143
 // https://code.qt.io/cgit/qt/qtbase.git/tree/src/corelib/itemmodels/qabstractitemmodel.h?h=v6.2.4#n243
-assert_alignment_and_size(QPersistentModelIndex,
-                          alignof(::std::size_t),
-                          sizeof(::std::size_t));
+assert_alignment_and_size(QPersistentModelIndex, { ::std::size_t a0; });
 
 static_assert(
   !::std::is_trivially_copy_assignable<QPersistentModelIndex>::value);

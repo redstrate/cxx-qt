@@ -5,11 +5,13 @@ mod inheritance {
         type QModelIndex = cxx_qt_lib::QModelIndex;
         include!("cxx-qt-lib/qvariant.h");
         type QVariant = cxx_qt_lib::QVariant;
+
+        type QAbstractItemModel;
     }
 
     extern "RustQt" {
         #[qobject]
-        #[base = "QAbstractItemModel"]
+        #[base = QAbstractItemModel]
         type MyObject = super::MyObjectRust;
     }
 
@@ -18,6 +20,10 @@ mod inheritance {
         #[cxx_name = "hasChildren"]
         #[inherit]
         fn has_children_super(self: &MyObject, parent: &QModelIndex) -> bool;
+
+        #[rust_name = "hello_world"]
+        #[inherit]
+        fn helloWorld(self: &MyObject, parent: &QModelIndex) -> bool;
     }
 
     extern "RustQt" {

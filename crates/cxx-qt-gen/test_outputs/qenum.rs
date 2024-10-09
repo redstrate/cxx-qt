@@ -6,13 +6,19 @@ mod ffi {
         #[doc(hidden)]
         #[namespace = "Qt"]
         #[rust_name = "CxxQtConnectionType"]
+        #[allow(dead_code)]
         type ConnectionType = cxx_qt::ConnectionType;
         #[doc(hidden)]
         #[namespace = "rust::cxxqt1"]
         #[rust_name = "CxxQtQMetaObjectConnection"]
+        #[allow(dead_code)]
         type QMetaObjectConnection = cxx_qt::QMetaObjectConnection;
     }
+    unsafe extern "C++" {
+        include!("directory/file_ident.cxxqt.h");
+    }
     #[repr(i32)]
+    #[namespace = "cxx_qt::my_object"]
     enum MyEnum {
         A,
     }
@@ -32,6 +38,7 @@ mod ffi {
         type MyOtherEnum;
     }
     #[repr(i32)]
+    #[namespace = "cxx_qt::my_object"]
     enum MyNamespacedEnum {
         A,
         B,
@@ -52,6 +59,7 @@ mod ffi {
         type MyOtherNamespacedEnum;
     }
     #[repr(i32)]
+    #[namespace = "cxx_qt::my_object"]
     enum MyRenamedEnum {
         A,
         B,
@@ -60,9 +68,6 @@ mod ffi {
     extern "C++" {
         #[namespace = "cxx_qt::my_object"]
         type MyRenamedEnum;
-    }
-    unsafe extern "C++" {
-        include!("cxx-qt-gen/ffi.cxxqt.h");
     }
     unsafe extern "C++" {
         #[doc = "The C++ type for the QObject "]
@@ -75,11 +80,13 @@ mod ffi {
         type MyObject;
     }
     extern "Rust" {
+        #[namespace = "cxx_qt::my_object"]
         type MyObjectRust;
     }
     extern "Rust" {
+        #[cxx_name = "myInvokable"]
+        #[namespace = "cxx_qt::my_object"]
         #[doc(hidden)]
-        #[cxx_name = "myInvokableWrapper"]
         fn my_invokable(self: &MyObject, qenum: MyEnum, other_qenum: MyOtherEnum);
     }
     extern "Rust" {
@@ -88,14 +95,18 @@ mod ffi {
         fn create_rs_my_object_rust() -> Box<MyObjectRust>;
     }
     unsafe extern "C++" {
-        #[cxx_name = "unsafeRust"]
         #[doc(hidden)]
-        fn cxx_qt_ffi_rust(self: &MyObject) -> &MyObjectRust;
+        #[cxx_name = "unsafeRust"]
+        #[namespace = "rust::cxxqt1"]
+        fn cxx_qt_ffi_my_object_unsafe_rust(outer: &MyObject) -> &MyObjectRust;
     }
     unsafe extern "C++" {
-        #[cxx_name = "unsafeRustMut"]
         #[doc(hidden)]
-        fn cxx_qt_ffi_rust_mut(self: Pin<&mut MyObject>) -> Pin<&mut MyObjectRust>;
+        #[cxx_name = "unsafeRustMut"]
+        #[namespace = "rust::cxxqt1"]
+        fn cxx_qt_ffi_my_object_unsafe_rust_mut(
+            outer: Pin<&mut MyObject>,
+        ) -> Pin<&mut MyObjectRust>;
     }
     unsafe extern "C++" {
         #[doc = "The C++ type for the QObject "]
@@ -111,6 +122,7 @@ mod ffi {
         type MyRenamedObject;
     }
     extern "Rust" {
+        #[namespace = "cxx_qt::my_object"]
         type InternalObject;
     }
     extern "Rust" {
@@ -119,53 +131,55 @@ mod ffi {
         fn create_rs_internal_object() -> Box<InternalObject>;
     }
     unsafe extern "C++" {
-        #[cxx_name = "unsafeRust"]
         #[doc(hidden)]
-        fn cxx_qt_ffi_rust(self: &MyRenamedObject) -> &InternalObject;
+        #[cxx_name = "unsafeRust"]
+        #[namespace = "rust::cxxqt1"]
+        fn cxx_qt_ffi_cxx_name_unsafe_rust(outer: &MyRenamedObject) -> &InternalObject;
     }
     unsafe extern "C++" {
-        #[cxx_name = "unsafeRustMut"]
         #[doc(hidden)]
-        fn cxx_qt_ffi_rust_mut(self: Pin<&mut MyRenamedObject>) -> Pin<&mut InternalObject>;
+        #[cxx_name = "unsafeRustMut"]
+        #[namespace = "rust::cxxqt1"]
+        fn cxx_qt_ffi_cxx_name_unsafe_rust_mut(
+            outer: Pin<&mut MyRenamedObject>,
+        ) -> Pin<&mut InternalObject>;
     }
 }
-impl cxx_qt::Locking for ffi::MyObject {}
 #[doc(hidden)]
 pub fn create_rs_my_object_rust() -> std::boxed::Box<MyObjectRust> {
     std::boxed::Box::new(core::default::Default::default())
 }
-impl core::ops::Deref for ffi::MyObject {
+impl ::core::ops::Deref for ffi::MyObject {
     type Target = MyObjectRust;
     fn deref(&self) -> &Self::Target {
-        self.cxx_qt_ffi_rust()
+        ffi::cxx_qt_ffi_my_object_unsafe_rust(self)
     }
 }
-impl cxx_qt::CxxQtType for ffi::MyObject {
+impl ::cxx_qt::CxxQtType for ffi::MyObject {
     type Rust = MyObjectRust;
     fn rust(&self) -> &Self::Rust {
-        self.cxx_qt_ffi_rust()
+        ffi::cxx_qt_ffi_my_object_unsafe_rust(self)
     }
     fn rust_mut(self: core::pin::Pin<&mut Self>) -> core::pin::Pin<&mut Self::Rust> {
-        self.cxx_qt_ffi_rust_mut()
+        ffi::cxx_qt_ffi_my_object_unsafe_rust_mut(self)
     }
 }
-impl cxx_qt::Locking for ffi::MyRenamedObject {}
 #[doc(hidden)]
 pub fn create_rs_internal_object() -> std::boxed::Box<InternalObject> {
     std::boxed::Box::new(core::default::Default::default())
 }
-impl core::ops::Deref for ffi::MyRenamedObject {
+impl ::core::ops::Deref for ffi::MyRenamedObject {
     type Target = InternalObject;
     fn deref(&self) -> &Self::Target {
-        self.cxx_qt_ffi_rust()
+        ffi::cxx_qt_ffi_cxx_name_unsafe_rust(self)
     }
 }
-impl cxx_qt::CxxQtType for ffi::MyRenamedObject {
+impl ::cxx_qt::CxxQtType for ffi::MyRenamedObject {
     type Rust = InternalObject;
     fn rust(&self) -> &Self::Rust {
-        self.cxx_qt_ffi_rust()
+        ffi::cxx_qt_ffi_cxx_name_unsafe_rust(self)
     }
     fn rust_mut(self: core::pin::Pin<&mut Self>) -> core::pin::Pin<&mut Self::Rust> {
-        self.cxx_qt_ffi_rust_mut()
+        ffi::cxx_qt_ffi_cxx_name_unsafe_rust_mut(self)
     }
 }

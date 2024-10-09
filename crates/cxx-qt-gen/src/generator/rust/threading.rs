@@ -14,24 +14,39 @@ use crate::{
     naming::TypeNames,
 };
 use quote::quote;
-use syn::{Ident, Result};
+use syn::Result;
 
 use super::fragment::RustFragmentPair;
 
 pub fn generate(
-    qobject_ident: &QObjectNames,
+    qobject_names: &QObjectNames,
     namespace_ident: &NamespaceName,
     type_names: &TypeNames,
-    module_ident: &Ident,
 ) -> Result<GeneratedRustFragment> {
     let mut blocks = GeneratedRustFragment::default();
 
-    let cpp_struct_ident = qobject_ident.name.rust_unqualified();
-    let cxx_qt_thread_ident = &qobject_ident.cxx_qt_thread_class;
-    let cxx_qt_thread_queued_fn_ident = &qobject_ident.cxx_qt_thread_queued_fn_struct;
-    let cxx_qt_thread_queue_fn = qobject_ident.cxx_qt_thread_method("queue_boxed_fn");
-    let cxx_qt_thread_clone = qobject_ident.cxx_qt_thread_method("threading_clone");
-    let cxx_qt_thread_drop = qobject_ident.cxx_qt_thread_method("threading_drop");
+    let module_ident = qobject_names.name.require_module()?;
+
+    let cpp_struct_ident = qobject_names.name.rust_unqualified();
+    let cxx_qt_thread_ident = &qobject_names.cxx_qt_thread_class;
+    let cxx_qt_thread_queued_fn_ident = &qobject_names.cxx_qt_thread_queued_fn_struct;
+
+    let (thread_queue_name, thread_queue_attrs, thread_queue_qualified) = qobject_names
+        .cxx_qt_ffi_method("cxxQtThreadQueue")
+        .into_cxx_parts();
+    let (thread_clone_name, thread_clone_attrs, thread_clone_qualified) = qobject_names
+        .cxx_qt_ffi_method("cxxQtThreadClone")
+        .into_cxx_parts();
+    let (thread_drop_name, thread_drop_attrs, thread_drop_qualified) = qobject_names
+        .cxx_qt_ffi_method("cxxQtThreadDrop")
+        .into_cxx_parts();
+    let (thread_fn_name, thread_fn_attrs, thread_fn_qualified) =
+        qobject_names.cxx_qt_ffi_method("qtThread").into_cxx_parts();
+    let (thread_is_destroyed_name, thread_is_destroyed_attrs, thread_is_destroyed_qualified) =
+        qobject_names
+            .cxx_qt_ffi_method("cxxQtThreadIsDestroyed")
+            .into_cxx_parts();
+
     let namespace_internals = &namespace_ident.internal;
     let cxx_qt_thread_ident_type_id_str =
         namespace_combine_ident(&namespace_ident.namespace, cxx_qt_thread_ident);
@@ -53,30 +68,31 @@ pub fn generate(
                     include!("cxx-qt/thread.h");
 
                     #[doc(hidden)]
-                    #[cxx_name = "qtThread"]
-                    fn cxx_qt_ffi_qt_thread(self: &#cpp_struct_ident) -> #cxx_qt_thread_ident;
+                    #(#thread_fn_attrs)*
+                    fn #thread_fn_name(qobject: &#cpp_struct_ident) -> #cxx_qt_thread_ident;
 
                     // SAFETY:
                     // - Send + 'static: argument closure can be transferred to QObject thread.
                     // - FnOnce: QMetaObject::invokeMethod() should call the function at most once.
                     #[doc(hidden)]
-                    #[namespace = "rust::cxxqt1"]
-                    #[cxx_name = "cxxQtThreadQueue"]
-                    fn #cxx_qt_thread_queue_fn(
+                    #(#thread_queue_attrs)*
+                    fn #thread_queue_name(
                         cxx_qt_thread: &#cxx_qt_thread_ident,
                         func: fn(Pin<&mut #cpp_struct_ident>, Box<#cxx_qt_thread_queued_fn_ident>),
                         arg: Box<#cxx_qt_thread_queued_fn_ident>,
                     ) -> Result<()>;
 
                     #[doc(hidden)]
-                    #[namespace = "rust::cxxqt1"]
-                    #[cxx_name = "cxxQtThreadClone"]
-                    fn #cxx_qt_thread_clone(cxx_qt_thread: &#cxx_qt_thread_ident) -> #cxx_qt_thread_ident;
+                    #(#thread_clone_attrs)*
+                    fn #thread_clone_name(cxx_qt_thread: &#cxx_qt_thread_ident) -> #cxx_qt_thread_ident;
 
                     #[doc(hidden)]
-                    #[namespace = "rust::cxxqt1"]
-                    #[cxx_name = "cxxQtThreadDrop"]
-                    fn #cxx_qt_thread_drop(cxx_qt_thread: &mut #cxx_qt_thread_ident);
+                    #(#thread_drop_attrs)*
+                    fn #thread_drop_name(cxx_qt_thread: &mut #cxx_qt_thread_ident);
+
+                    #[doc(hidden)]
+                    #(#thread_is_destroyed_attrs)*
+                    fn #thread_is_destroyed_name(cxx_qt_thread: &#cxx_qt_thread_ident) -> bool;
                 }
             },
             quote! {
@@ -94,7 +110,13 @@ pub fn generate(
 
                     fn qt_thread(&self) -> #module_ident::#cxx_qt_thread_ident
                     {
-                        self.cxx_qt_ffi_qt_thread()
+                        #thread_fn_qualified(self)
+                    }
+
+                    #[doc(hidden)]
+                    fn is_destroyed(cxx_qt_thread: &#module_ident::#cxx_qt_thread_ident) -> bool
+                    {
+                        #thread_is_destroyed_qualified(cxx_qt_thread)
                     }
 
                     #[doc(hidden)]
@@ -115,19 +137,19 @@ pub fn generate(
                             (arg.inner)(obj)
                         }
                         let arg = #cxx_qt_thread_queued_fn_ident { inner: std::boxed::Box::new(f) };
-                        #module_ident::#cxx_qt_thread_queue_fn(cxx_qt_thread, func, std::boxed::Box::new(arg))
+                        #thread_queue_qualified(cxx_qt_thread, func, std::boxed::Box::new(arg))
                     }
 
                     #[doc(hidden)]
                     fn threading_clone(cxx_qt_thread: &#module_ident::#cxx_qt_thread_ident) -> #module_ident::#cxx_qt_thread_ident
                     {
-                        #module_ident::#cxx_qt_thread_clone(cxx_qt_thread)
+                        #thread_clone_qualified(cxx_qt_thread)
                     }
 
                     #[doc(hidden)]
                     fn threading_drop(cxx_qt_thread: &mut #module_ident::#cxx_qt_thread_ident)
                     {
-                        #module_ident::#cxx_qt_thread_drop(cxx_qt_thread);
+                        #thread_drop_qualified(cxx_qt_thread);
                     }
                 }
             },
@@ -161,21 +183,13 @@ mod tests {
 
     use crate::parser::qobject::tests::create_parsed_qobject;
 
-    use quote::format_ident;
-
     #[test]
     fn test_generate_rust_threading() {
         let qobject = create_parsed_qobject();
-        let qobject_idents = QObjectNames::from_qobject(&qobject, &TypeNames::mock()).unwrap();
+        let qobject_names = QObjectNames::from_qobject(&qobject, &TypeNames::mock()).unwrap();
         let namespace_ident = NamespaceName::from(&qobject);
 
-        let generated = generate(
-            &qobject_idents,
-            &namespace_ident,
-            &TypeNames::mock(),
-            &format_ident!("qobject"),
-        )
-        .unwrap();
+        let generated = generate(&qobject_names, &namespace_ident, &TypeNames::mock()).unwrap();
 
         assert_eq!(generated.cxx_mod_contents.len(), 2);
         assert_eq!(generated.cxx_qt_mod_contents.len(), 2);
@@ -192,29 +206,36 @@ mod tests {
 
                     #[doc(hidden)]
                     #[cxx_name = "qtThread"]
-                    fn cxx_qt_ffi_qt_thread(self: &MyObject) -> MyObjectCxxQtThread;
+                    #[namespace = "rust::cxxqt1"]
+                    fn cxx_qt_ffi_my_object_qt_thread(qobject: &MyObject) -> MyObjectCxxQtThread;
 
                     // SAFETY:
                     // - Send + 'static: argument closure can be transferred to QObject thread.
                     // - FnOnce: QMetaObject::invokeMethod() should call the function at most once.
                     #[doc(hidden)]
-                    #[namespace = "rust::cxxqt1"]
                     #[cxx_name = "cxxQtThreadQueue"]
-                    fn cxx_qt_ffi_my_object_queue_boxed_fn(
+                    #[namespace = "rust::cxxqt1"]
+                    fn cxx_qt_ffi_my_object_cxx_qt_thread_queue(
                         cxx_qt_thread: &MyObjectCxxQtThread,
                         func: fn(Pin<&mut MyObject>, Box<MyObjectCxxQtThreadQueuedFn>),
                         arg: Box<MyObjectCxxQtThreadQueuedFn>,
                     ) -> Result<()>;
 
                     #[doc(hidden)]
-                    #[namespace = "rust::cxxqt1"]
                     #[cxx_name = "cxxQtThreadClone"]
-                    fn cxx_qt_ffi_my_object_threading_clone(cxx_qt_thread: &MyObjectCxxQtThread) -> MyObjectCxxQtThread;
+                    #[namespace = "rust::cxxqt1"]
+                    fn cxx_qt_ffi_my_object_cxx_qt_thread_clone(cxx_qt_thread: &MyObjectCxxQtThread) -> MyObjectCxxQtThread;
 
                     #[doc(hidden)]
-                    #[namespace = "rust::cxxqt1"]
                     #[cxx_name = "cxxQtThreadDrop"]
-                    fn cxx_qt_ffi_my_object_threading_drop(cxx_qt_thread: &mut MyObjectCxxQtThread);
+                    #[namespace = "rust::cxxqt1"]
+                    fn cxx_qt_ffi_my_object_cxx_qt_thread_drop(cxx_qt_thread: &mut MyObjectCxxQtThread);
+
+                    #[doc(hidden)]
+                    #[cxx_name = "cxxQtThreadIsDestroyed"]
+                    #[namespace = "rust::cxxqt1"]
+                    fn cxx_qt_ffi_my_object_cxx_qt_thread_is_destroyed(cxx_qt_thread: &MyObjectCxxQtThread)
+                        -> bool;
                 }
             },
         );
@@ -238,7 +259,12 @@ mod tests {
 
                     fn qt_thread(&self) -> qobject::MyObjectCxxQtThread
                     {
-                        self.cxx_qt_ffi_qt_thread()
+                        qobject::cxx_qt_ffi_my_object_qt_thread(self)
+                    }
+
+                    #[doc(hidden)]
+                    fn is_destroyed(cxx_qt_thread: &qobject::MyObjectCxxQtThread) -> bool {
+                        qobject::cxx_qt_ffi_my_object_cxx_qt_thread_is_destroyed(cxx_qt_thread)
                     }
 
                     #[doc(hidden)]
@@ -259,19 +285,19 @@ mod tests {
                             (arg.inner)(obj)
                         }
                         let arg = MyObjectCxxQtThreadQueuedFn { inner: std::boxed::Box::new(f) };
-                        qobject::cxx_qt_ffi_my_object_queue_boxed_fn(cxx_qt_thread, func, std::boxed::Box::new(arg))
+                        qobject::cxx_qt_ffi_my_object_cxx_qt_thread_queue(cxx_qt_thread, func, std::boxed::Box::new(arg))
                     }
 
                     #[doc(hidden)]
                     fn threading_clone(cxx_qt_thread: &qobject::MyObjectCxxQtThread) -> qobject::MyObjectCxxQtThread
                     {
-                        qobject::cxx_qt_ffi_my_object_threading_clone(cxx_qt_thread)
+                        qobject::cxx_qt_ffi_my_object_cxx_qt_thread_clone(cxx_qt_thread)
                     }
 
                     #[doc(hidden)]
                     fn threading_drop(cxx_qt_thread: &mut qobject::MyObjectCxxQtThread)
                     {
-                        qobject::cxx_qt_ffi_my_object_threading_drop(cxx_qt_thread);
+                        qobject::cxx_qt_ffi_my_object_cxx_qt_thread_drop(cxx_qt_thread);
                     }
                 }
             },

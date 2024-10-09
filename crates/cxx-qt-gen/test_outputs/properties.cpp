@@ -1,4 +1,4 @@
-#include "cxx-qt-gen/ffi.cxxqt.h"
+#include "directory/file_ident.cxxqt.h"
 
 // Define namespace otherwise we hit a GCC bug
 // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=56480
@@ -50,8 +50,6 @@ MyObject_primitiveChangedConnect(
     &cxx_qt::my_object::MyObject::primitiveChanged,
     &self,
     [&, closure = ::std::move(closure)]() mutable {
-      const ::rust::cxxqt1::MaybeLockGuard<cxx_qt::my_object::MyObject> guard(
-        self);
       closure.template operator()<cxx_qt::my_object::MyObject&>(self);
     },
     type);
@@ -108,8 +106,230 @@ MyObject_trivialChangedConnect(
     &cxx_qt::my_object::MyObject::trivialChanged,
     &self,
     [&, closure = ::std::move(closure)]() mutable {
-      const ::rust::cxxqt1::MaybeLockGuard<cxx_qt::my_object::MyObject> guard(
-        self);
+      closure.template operator()<cxx_qt::my_object::MyObject&>(self);
+    },
+    type);
+}
+} // namespace cxx_qt::my_object::rust::cxxqtgen1
+
+// Define namespace otherwise we hit a GCC bug
+// https://gcc.gnu.org/bugzilla/show_bug.cgi?id=56480
+namespace rust::cxxqt1 {
+template<>
+SignalHandler<::cxx_qt::my_object::rust::cxxqtgen1::
+                MyObjectCxxQtSignalParamscustomFunctionPropChanged*>::
+  ~SignalHandler() noexcept
+{
+  if (data[0] == nullptr && data[1] == nullptr) {
+    return;
+  }
+
+  drop_MyObject_signal_handler_customFunctionPropChanged(::std::move(*this));
+}
+
+template<>
+template<>
+void
+SignalHandler<::cxx_qt::my_object::rust::cxxqtgen1::
+                MyObjectCxxQtSignalParamscustomFunctionPropChanged*>::
+operator()<cxx_qt::my_object::MyObject&>(cxx_qt::my_object::MyObject& self)
+{
+  call_MyObject_signal_handler_customFunctionPropChanged(*this, self);
+}
+
+static_assert(
+  alignof(
+    SignalHandler<::cxx_qt::my_object::rust::cxxqtgen1::
+                    MyObjectCxxQtSignalParamscustomFunctionPropChanged*>) <=
+    alignof(::std::size_t),
+  "unexpected aligment");
+static_assert(
+  sizeof(
+    SignalHandler<::cxx_qt::my_object::rust::cxxqtgen1::
+                    MyObjectCxxQtSignalParamscustomFunctionPropChanged*>) ==
+    sizeof(::std::size_t[2]),
+  "unexpected size");
+} // namespace rust::cxxqt1
+
+namespace cxx_qt::my_object::rust::cxxqtgen1 {
+::QMetaObject::Connection
+MyObject_customFunctionPropChangedConnect(
+  cxx_qt::my_object::MyObject& self,
+  ::cxx_qt::my_object::rust::cxxqtgen1::
+    MyObjectCxxQtSignalHandlercustomFunctionPropChanged closure,
+  ::Qt::ConnectionType type)
+{
+  return ::QObject::connect(
+    &self,
+    &cxx_qt::my_object::MyObject::customFunctionPropChanged,
+    &self,
+    [&, closure = ::std::move(closure)]() mutable {
+      closure.template operator()<cxx_qt::my_object::MyObject&>(self);
+    },
+    type);
+}
+} // namespace cxx_qt::my_object::rust::cxxqtgen1
+
+// Define namespace otherwise we hit a GCC bug
+// https://gcc.gnu.org/bugzilla/show_bug.cgi?id=56480
+namespace rust::cxxqt1 {
+template<>
+SignalHandler<
+  ::cxx_qt::my_object::rust::cxxqtgen1::
+    MyObjectCxxQtSignalParamsrenamedPropertyChanged*>::~SignalHandler() noexcept
+{
+  if (data[0] == nullptr && data[1] == nullptr) {
+    return;
+  }
+
+  drop_MyObject_signal_handler_renamedPropertyChanged(::std::move(*this));
+}
+
+template<>
+template<>
+void
+SignalHandler<::cxx_qt::my_object::rust::cxxqtgen1::
+                MyObjectCxxQtSignalParamsrenamedPropertyChanged*>::
+operator()<cxx_qt::my_object::MyObject&>(cxx_qt::my_object::MyObject& self)
+{
+  call_MyObject_signal_handler_renamedPropertyChanged(*this, self);
+}
+
+static_assert(
+  alignof(SignalHandler<::cxx_qt::my_object::rust::cxxqtgen1::
+                          MyObjectCxxQtSignalParamsrenamedPropertyChanged*>) <=
+    alignof(::std::size_t),
+  "unexpected aligment");
+static_assert(
+  sizeof(SignalHandler<::cxx_qt::my_object::rust::cxxqtgen1::
+                         MyObjectCxxQtSignalParamsrenamedPropertyChanged*>) ==
+    sizeof(::std::size_t[2]),
+  "unexpected size");
+} // namespace rust::cxxqt1
+
+namespace cxx_qt::my_object::rust::cxxqtgen1 {
+::QMetaObject::Connection
+MyObject_renamedPropertyChangedConnect(
+  cxx_qt::my_object::MyObject& self,
+  ::cxx_qt::my_object::rust::cxxqtgen1::
+    MyObjectCxxQtSignalHandlerrenamedPropertyChanged closure,
+  ::Qt::ConnectionType type)
+{
+  return ::QObject::connect(
+    &self,
+    &cxx_qt::my_object::MyObject::renamedPropertyChanged,
+    &self,
+    [&, closure = ::std::move(closure)]() mutable {
+      closure.template operator()<cxx_qt::my_object::MyObject&>(self);
+    },
+    type);
+}
+} // namespace cxx_qt::my_object::rust::cxxqtgen1
+
+// Define namespace otherwise we hit a GCC bug
+// https://gcc.gnu.org/bugzilla/show_bug.cgi?id=56480
+namespace rust::cxxqt1 {
+template<>
+SignalHandler<
+  ::cxx_qt::my_object::rust::cxxqtgen1::
+    MyObjectCxxQtSignalParamsnamed_prop_2Changed*>::~SignalHandler() noexcept
+{
+  if (data[0] == nullptr && data[1] == nullptr) {
+    return;
+  }
+
+  drop_MyObject_signal_handler_named_prop_2Changed(::std::move(*this));
+}
+
+template<>
+template<>
+void
+SignalHandler<::cxx_qt::my_object::rust::cxxqtgen1::
+                MyObjectCxxQtSignalParamsnamed_prop_2Changed*>::
+operator()<cxx_qt::my_object::MyObject&>(cxx_qt::my_object::MyObject& self)
+{
+  call_MyObject_signal_handler_named_prop_2Changed(*this, self);
+}
+
+static_assert(
+  alignof(SignalHandler<::cxx_qt::my_object::rust::cxxqtgen1::
+                          MyObjectCxxQtSignalParamsnamed_prop_2Changed*>) <=
+    alignof(::std::size_t),
+  "unexpected aligment");
+static_assert(
+  sizeof(SignalHandler<::cxx_qt::my_object::rust::cxxqtgen1::
+                         MyObjectCxxQtSignalParamsnamed_prop_2Changed*>) ==
+    sizeof(::std::size_t[2]),
+  "unexpected size");
+} // namespace rust::cxxqt1
+
+namespace cxx_qt::my_object::rust::cxxqtgen1 {
+::QMetaObject::Connection
+MyObject_named_prop_2ChangedConnect(
+  cxx_qt::my_object::MyObject& self,
+  ::cxx_qt::my_object::rust::cxxqtgen1::
+    MyObjectCxxQtSignalHandlernamed_prop_2Changed closure,
+  ::Qt::ConnectionType type)
+{
+  return ::QObject::connect(
+    &self,
+    &cxx_qt::my_object::MyObject::named_prop_2Changed,
+    &self,
+    [&, closure = ::std::move(closure)]() mutable {
+      closure.template operator()<cxx_qt::my_object::MyObject&>(self);
+    },
+    type);
+}
+} // namespace cxx_qt::my_object::rust::cxxqtgen1
+
+// Define namespace otherwise we hit a GCC bug
+// https://gcc.gnu.org/bugzilla/show_bug.cgi?id=56480
+namespace rust::cxxqt1 {
+template<>
+SignalHandler<
+  ::cxx_qt::my_object::rust::cxxqtgen1::MyObjectCxxQtSignalParamsmyOnChanged*>::
+  ~SignalHandler() noexcept
+{
+  if (data[0] == nullptr && data[1] == nullptr) {
+    return;
+  }
+
+  drop_MyObject_signal_handler_myOnChanged(::std::move(*this));
+}
+
+template<>
+template<>
+void
+SignalHandler<
+  ::cxx_qt::my_object::rust::cxxqtgen1::MyObjectCxxQtSignalParamsmyOnChanged*>::
+operator()<cxx_qt::my_object::MyObject&>(cxx_qt::my_object::MyObject& self)
+{
+  call_MyObject_signal_handler_myOnChanged(*this, self);
+}
+
+static_assert(alignof(SignalHandler<::cxx_qt::my_object::rust::cxxqtgen1::
+                                      MyObjectCxxQtSignalParamsmyOnChanged*>) <=
+                alignof(::std::size_t),
+              "unexpected aligment");
+static_assert(sizeof(SignalHandler<::cxx_qt::my_object::rust::cxxqtgen1::
+                                     MyObjectCxxQtSignalParamsmyOnChanged*>) ==
+                sizeof(::std::size_t[2]),
+              "unexpected size");
+} // namespace rust::cxxqt1
+
+namespace cxx_qt::my_object::rust::cxxqtgen1 {
+::QMetaObject::Connection
+MyObject_myOnChangedConnect(
+  cxx_qt::my_object::MyObject& self,
+  ::cxx_qt::my_object::rust::cxxqtgen1::MyObjectCxxQtSignalHandlermyOnChanged
+    closure,
+  ::Qt::ConnectionType type)
+{
+  return ::QObject::connect(
+    &self,
+    &cxx_qt::my_object::MyObject::myOnChanged,
+    &self,
+    [&, closure = ::std::move(closure)]() mutable {
       closure.template operator()<cxx_qt::my_object::MyObject&>(self);
     },
     type);
@@ -117,39 +337,10 @@ MyObject_trivialChangedConnect(
 } // namespace cxx_qt::my_object::rust::cxxqtgen1
 
 namespace cxx_qt::my_object {
-::std::int32_t const&
-MyObject::getPrimitive() const
-{
-  const ::rust::cxxqt1::MaybeLockGuard<MyObject> guard(*this);
-  return getPrimitiveWrapper();
-}
-
-void
-MyObject::setPrimitive(::std::int32_t const& value)
-{
-  const ::rust::cxxqt1::MaybeLockGuard<MyObject> guard(*this);
-  setPrimitiveWrapper(value);
-}
-
-QPoint const&
-MyObject::getTrivial() const
-{
-  const ::rust::cxxqt1::MaybeLockGuard<MyObject> guard(*this);
-  return getTrivialWrapper();
-}
-
-void
-MyObject::setTrivial(QPoint const& value)
-{
-  const ::rust::cxxqt1::MaybeLockGuard<MyObject> guard(*this);
-  setTrivialWrapper(value);
-}
-
 MyObject::MyObject(QObject* parent)
   : QObject(parent)
   , ::rust::cxxqt1::CxxQtType<MyObjectRust>(
       ::cxx_qt::my_object::cxx_qt_my_object::createRs())
-  , ::rust::cxxqt1::CxxQtLocking()
 {
 }
 

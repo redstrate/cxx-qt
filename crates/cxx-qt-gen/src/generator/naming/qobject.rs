@@ -7,7 +7,8 @@ use crate::{
     parser::qobject::ParsedQObject,
 };
 use convert_case::{Case, Casing};
-use quote::format_ident;
+use proc_macro2::TokenStream;
+use quote::{format_ident, quote};
 use syn::{Ident, Result};
 
 /// Names for parts of a Q_OBJECT
@@ -55,12 +56,31 @@ impl QObjectNames {
         }
     }
 
-    /// For a given ident generate the mangled threading suffix ident
-    pub fn cxx_qt_thread_method(&self, suffix: &str) -> Ident {
-        format_ident!(
+    /// For a given C++ function, generate a free function name specific to this class.
+    /// This is then used can be used to wrap the free function as a new member function through
+    /// CXX.
+    pub fn cxx_qt_ffi_method(&self, cxx_name: &str) -> Name {
+        let ident = format_ident!(
             "cxx_qt_ffi_{ident}_{suffix}",
-            ident = self.name.cxx_unqualified().to_case(Case::Snake)
-        )
+            ident = self.name.cxx_unqualified().to_case(Case::Snake),
+            suffix = cxx_name.to_case(Case::Snake)
+        );
+        let mut name = Name::new(ident);
+        if let Some(module) = self.name.module() {
+            name = name.with_module(module.clone());
+        }
+        name.with_namespace("rust::cxxqt1".to_owned())
+            .with_cxx_name(cxx_name.to_owned())
+    }
+
+    /// Returns the tokens of the namespace attribute to be added to a rust line, or no tokens if this instance has no namespace
+    /// attribute looks like `#[namespace = "namespace::here"]`
+    pub fn namespace_tokens(&self) -> TokenStream {
+        if let Some(namespace) = self.name.namespace() {
+            quote! { #[namespace = #namespace ] }
+        } else {
+            quote! {}
+        }
     }
 }
 
@@ -89,31 +109,34 @@ pub mod tests {
         let names =
             QObjectNames::from_qobject(&create_parsed_qobject(), &TypeNames::mock()).unwrap();
         assert_eq!(names.name.cxx_unqualified(), "MyObject");
-        assert_eq!(names.name.rust_unqualified(), &format_ident!("MyObject"));
+        assert_eq!(names.name.rust_unqualified(), "MyObject");
         assert_eq!(names.rust_struct.cxx_unqualified(), "MyObjectRust");
-        assert_eq!(
-            names.rust_struct.rust_unqualified(),
-            &format_ident!("MyObjectRust")
-        );
-        assert_eq!(
-            names.cxx_qt_thread_class,
-            format_ident!("MyObjectCxxQtThread")
-        );
+        assert_eq!(names.rust_struct.rust_unqualified(), "MyObjectRust");
+        assert_eq!(names.cxx_qt_thread_class, "MyObjectCxxQtThread");
         assert_eq!(
             names.cxx_qt_thread_queued_fn_struct,
-            format_ident!("MyObjectCxxQtThreadQueuedFn")
+            "MyObjectCxxQtThreadQueuedFn"
         );
 
         assert_eq!(
-            names.cxx_qt_thread_method("threading_clone"),
-            "cxx_qt_ffi_my_object_threading_clone"
+            names.cxx_qt_ffi_method("threading_clone").into_cxx_parts(),
+            (
+                format_ident!("cxx_qt_ffi_my_object_threading_clone"),
+                vec![
+                    syn::parse_quote! { #[cxx_name="threading_clone"] },
+                    syn::parse_quote! { #[namespace="rust::cxxqt1"] },
+                ],
+                syn::parse_quote! { qobject::cxx_qt_ffi_my_object_threading_clone}
+            )
         );
+        // These have the same values for namespace, and Rust module, so no need to
+        // assert those again
         assert_eq!(
-            names.cxx_qt_thread_method("threading_drop"),
+            names.cxx_qt_ffi_method("threading_drop").rust_unqualified(),
             "cxx_qt_ffi_my_object_threading_drop"
         );
         assert_eq!(
-            names.cxx_qt_thread_method("queue_boxed_fn"),
+            names.cxx_qt_ffi_method("queue_boxed_fn").rust_unqualified(),
             "cxx_qt_ffi_my_object_queue_boxed_fn"
         );
     }

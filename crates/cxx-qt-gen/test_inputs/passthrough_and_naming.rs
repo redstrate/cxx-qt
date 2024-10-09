@@ -1,6 +1,4 @@
-#[attrA]
-#[cxx_qt::bridge(namespace = "cxx_qt::multi_object", cxx_file_stem = "multi_object")]
-#[attrB]
+#[cxx_qt::bridge(namespace = "cxx_qt::multi_object")]
 pub mod ffi {
     // ItemConst
     const MAX: u16 = 65535;
@@ -37,9 +35,9 @@ pub mod ffi {
     extern "C" {}
 
     #[namespace = "namespace"]
-    #[custom_attr = "test"]
     extern "C" {}
 
+    #[custom_attr = "test"]
     unsafe extern "C++" {}
 
     #[namespace = "namespace"]
@@ -87,8 +85,10 @@ pub mod ffi {
     // ItemUse
     use super::MyTrait;
 
+    #[namespace = ""]
     unsafe extern "C++" {
         include!(<QtCore/QStringListModel>);
+        type QStringListModel;
     }
 
     #[namespace = ""]
@@ -115,7 +115,7 @@ pub mod ffi {
 
     extern "RustQt" {
         #[qobject]
-        #[base = "QStringListModel"]
+        #[base = QStringListModel]
         #[qproperty(i32, property_name)]
         type MyObject = super::MyObjectRust;
     }
@@ -135,10 +135,7 @@ pub mod ffi {
         type SecondObject = super::SecondObjectRust;
     }
 
-    unsafe impl !cxx_qt::Locking for SecondObject {}
-
     unsafe extern "RustQt" {
-        #[my_attribute]
         #[qsignal]
         fn ready(self: Pin<&mut SecondObject>);
 

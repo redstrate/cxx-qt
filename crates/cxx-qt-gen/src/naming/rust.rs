@@ -3,11 +3,13 @@
 //
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-use syn::{
-    GenericArgument, PathArguments, PathSegment, Result, ReturnType, Type, TypePath, TypeReference,
-};
-
 use crate::naming::TypeNames;
+use crate::syntax::lifetimes::err_unsupported_type;
+use syn::spanned::Spanned;
+use syn::{
+    Error, GenericArgument, PathArguments, PathSegment, Result, ReturnType, Type, TypePath,
+    TypeReference,
+};
 
 macro_rules! convert_elem {
     ($id:ident, $variant:path, $type_names:ident) => {{
@@ -26,6 +28,8 @@ fn qualify_type_path(ty_path: &TypePath, type_names: &TypeNames) -> Result<Type>
             for arg in angled.args.iter_mut() {
                 if let GenericArgument::Type(ty) = arg {
                     *ty = syn_type_cxx_bridge_to_qualified(ty, type_names)?;
+                } else {
+                    return Err(Error::new(arg.span(), "Unsupported GenericArgument type!"));
                 }
             }
         }
@@ -47,10 +51,14 @@ fn qualify_type_path(ty_path: &TypePath, type_names: &TypeNames) -> Result<Type>
         // Inject the qualified prefix into the path if there is one
         if let Some(qualified_prefix) = qualified_prefix {
             for part in qualified_prefix.iter().rev() {
-                let segment: PathSegment = syn::parse_str(part).unwrap();
+                let segment: PathSegment = syn::parse_str(part)?;
                 ty_path.path.segments.insert(0, segment);
             }
         }
+    } else {
+        // CODECOV_EXCLUDE_START
+        unreachable!("Path cannot be empty!")
+        // CODECOV_EXCLUDE_STOP
     }
 
     // If the path matches a known ident then used the qualified mapping
@@ -98,7 +106,7 @@ pub(crate) fn syn_type_cxx_bridge_to_qualified(ty: &Type, type_names: &TypeNames
             }
             Ok(Type::Tuple(ty_tuple))
         }
-        _others => Err(syn::Error::new_spanned(ty, "Unsupported type")),
+        _others => Err(err_unsupported_type(ty)),
     }
 }
 
@@ -173,8 +181,22 @@ mod tests {
         { &mut [UniquePtr<T>] } => { &mut[cxx::UniquePtr<T>] },
         { (UniquePtr<T>, ) } => { (cxx::UniquePtr<T>, ) },
         // Mapped type
-        { MyObject } => { qobject::MyObject }
+        { MyObject } => { qobject::MyObject },
+        { fn(i32) } => { fn(i32) }
         ];
+    }
+
+    #[test]
+    fn test_syn_type_cxx_bridge_invalid() {
+        let ty = parse_quote! { Vec<'a,T> };
+        let mut type_names = TypeNames::default();
+        type_names.mock_insert("A", None, None, None);
+        assert!(syn_type_cxx_bridge_to_qualified(&ty, &type_names).is_err());
+
+        let ty = parse_quote! { (T) };
+        let mut type_names = TypeNames::default();
+        type_names.mock_insert("A", None, None, None);
+        assert!(syn_type_cxx_bridge_to_qualified(&ty, &type_names).is_err());
     }
 
     #[test]
@@ -183,9 +205,19 @@ mod tests {
     }
 
     #[test]
+    fn test_syn_type_is_cxx_bridge_unsafe_path_other() {
+        assert!(!syn_type_is_cxx_bridge_unsafe(
+            &parse_quote! { impl MyTrait }
+        ));
+    }
+
+    #[test]
     fn test_syn_type_is_cxx_bridge_unsafe_path_template() {
         assert!(!syn_type_is_cxx_bridge_unsafe(
             &parse_quote! { Vector<i32> }
+        ));
+        assert!(!syn_type_is_cxx_bridge_unsafe(
+            &parse_quote! { Vector<'a,i32> }
         ));
         assert!(syn_type_is_cxx_bridge_unsafe(
             &parse_quote! { Vector<*mut T> }

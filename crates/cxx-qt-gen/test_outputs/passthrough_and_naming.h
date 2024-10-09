@@ -1,7 +1,5 @@
 #pragma once
 
-#include <cxx-qt/locking.h>
-#include <cxx-qt/maybelockguard.h>
 #include <cxx-qt/signalhandler.h>
 #include <cxx-qt/type.h>
 
@@ -21,11 +19,6 @@ using MyObjectCxxQtSignalHandlerready =
   ::rust::cxxqt1::SignalHandler<struct MyObjectCxxQtSignalParamsready*>;
 } // namespace cxx_qt::multi_object::rust::cxxqtgen1
 
-namespace my_namespace {
-class MyCxxName;
-
-} // namespace my_namespace
-
 namespace second_object {
 class SecondObject;
 
@@ -42,10 +35,15 @@ using SecondObjectCxxQtSignalHandlerready =
   ::rust::cxxqt1::SignalHandler<struct SecondObjectCxxQtSignalParamsready*>;
 } // namespace second_object::rust::cxxqtgen1
 
-namespace rust::cxxqtgen1 {
+namespace my_namespace {
+class MyCxxName;
+
+} // namespace my_namespace
+
+namespace cxx_qt::multi_object::rust::cxxqtgen1 {
 using QPushButtonCxxQtSignalHandlerclicked =
   ::rust::cxxqt1::SignalHandler<struct QPushButtonCxxQtSignalParamsclicked*>;
-} // namespace rust::cxxqtgen1
+} // namespace cxx_qt::multi_object::rust::cxxqtgen1
 
 namespace mynamespace::rust::cxxqtgen1 {
 using ExternObjectCxxQtSignalHandlerdataReady =
@@ -58,15 +56,16 @@ using ExternObjectCxxQtSignalHandlererrorOccurred =
     struct ExternObjectCxxQtSignalParamserrorOccurred*>;
 } // namespace mynamespace::rust::cxxqtgen1
 
-#include "cxx-qt-gen/multi_object.cxx.h"
+#include "directory/file_ident.cxx.h"
 
-namespace rust::cxxqtgen1 {
+namespace cxx_qt::multi_object::rust::cxxqtgen1 {
 ::QMetaObject::Connection
 QPushButton_clickedConnect(
-  QPushButton& self,
-  ::rust::cxxqtgen1::QPushButtonCxxQtSignalHandlerclicked closure,
+  cxx_qt::multi_object::QPushButton& self,
+  ::cxx_qt::multi_object::rust::cxxqtgen1::QPushButtonCxxQtSignalHandlerclicked
+    closure,
   ::Qt::ConnectionType type);
-} // namespace rust::cxxqtgen1
+} // namespace cxx_qt::multi_object::rust::cxxqtgen1
 
 namespace mynamespace::rust::cxxqtgen1 {
 ::QMetaObject::Connection
@@ -108,7 +107,6 @@ namespace cxx_qt::multi_object {
 class MyObject
   : public QStringListModel
   , public ::rust::cxxqt1::CxxQtType<MyObjectRust>
-  , public ::rust::cxxqt1::CxxQtLocking
 {
   Q_OBJECT
 public:
@@ -118,17 +116,12 @@ public:
   virtual ~MyObject() = default;
 
 public:
-  ::std::int32_t const& getPropertyName() const;
-  Q_SLOT void setPropertyName(::std::int32_t const& value);
+  ::std::int32_t const& getPropertyName() const noexcept;
+  Q_SLOT void setPropertyName(::std::int32_t value) noexcept;
   Q_SIGNAL void propertyNameChanged();
-  Q_INVOKABLE void invokableName();
+  Q_INVOKABLE void invokableName() noexcept;
   Q_SIGNAL void ready();
   explicit MyObject(QObject* parent = nullptr);
-
-private:
-  ::std::int32_t const& getPropertyNameWrapper() const noexcept;
-  void setPropertyNameWrapper(::std::int32_t value) noexcept;
-  void invokableNameWrapper() noexcept;
 };
 
 static_assert(::std::is_base_of<QObject, MyObject>::value,
@@ -136,26 +129,6 @@ static_assert(::std::is_base_of<QObject, MyObject>::value,
 } // namespace cxx_qt::multi_object
 
 Q_DECLARE_METATYPE(cxx_qt::multi_object::MyObject*)
-
-namespace my_namespace {
-class MyCxxName
-  : public QObject
-  , public ::rust::cxxqt1::CxxQtType<ThirdObjectRust>
-  , public ::rust::cxxqt1::CxxQtLocking
-{
-  Q_OBJECT
-public:
-  virtual ~MyCxxName() = default;
-
-public:
-  explicit MyCxxName(QObject* parent = nullptr);
-};
-
-static_assert(::std::is_base_of<QObject, MyCxxName>::value,
-              "MyCxxName must inherit from QObject");
-} // namespace my_namespace
-
-Q_DECLARE_METATYPE(my_namespace::MyCxxName*)
 
 namespace second_object::rust::cxxqtgen1 {
 ::QMetaObject::Connection
@@ -187,17 +160,12 @@ public:
   virtual ~SecondObject() = default;
 
 public:
-  ::std::int32_t const& getPropertyName() const;
-  Q_SLOT void setPropertyName(::std::int32_t const& value);
+  ::std::int32_t const& getPropertyName() const noexcept;
+  Q_SLOT void setPropertyName(::std::int32_t value) noexcept;
   Q_SIGNAL void propertyNameChanged();
-  Q_INVOKABLE void invokableName();
+  Q_INVOKABLE void invokableName() noexcept;
   Q_SIGNAL void ready();
   explicit SecondObject(QObject* parent = nullptr);
-
-private:
-  ::std::int32_t const& getPropertyNameWrapper() const noexcept;
-  void setPropertyNameWrapper(::std::int32_t value) noexcept;
-  void invokableNameWrapper() noexcept;
 };
 
 static_assert(::std::is_base_of<QObject, SecondObject>::value,
@@ -205,3 +173,22 @@ static_assert(::std::is_base_of<QObject, SecondObject>::value,
 } // namespace second_object
 
 Q_DECLARE_METATYPE(second_object::SecondObject*)
+
+namespace my_namespace {
+class MyCxxName
+  : public QObject
+  , public ::rust::cxxqt1::CxxQtType<ThirdObjectRust>
+{
+  Q_OBJECT
+public:
+  virtual ~MyCxxName() = default;
+
+public:
+  explicit MyCxxName(QObject* parent = nullptr);
+};
+
+static_assert(::std::is_base_of<QObject, MyCxxName>::value,
+              "MyCxxName must inherit from QObject");
+} // namespace my_namespace
+
+Q_DECLARE_METATYPE(my_namespace::MyCxxName*)

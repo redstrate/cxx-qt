@@ -5,6 +5,7 @@ mod inheritance {
         type QModelIndex = cxx_qt_lib::QModelIndex;
         include!("cxx-qt-lib/qvariant.h");
         type QVariant = cxx_qt_lib::QVariant;
+        type QAbstractItemModel;
     }
     unsafe extern "C++" {
         include ! (< QtCore / QObject >);
@@ -12,14 +13,16 @@ mod inheritance {
         #[doc(hidden)]
         #[namespace = "Qt"]
         #[rust_name = "CxxQtConnectionType"]
+        #[allow(dead_code)]
         type ConnectionType = cxx_qt::ConnectionType;
         #[doc(hidden)]
         #[namespace = "rust::cxxqt1"]
         #[rust_name = "CxxQtQMetaObjectConnection"]
+        #[allow(dead_code)]
         type QMetaObjectConnection = cxx_qt::QMetaObjectConnection;
     }
     unsafe extern "C++" {
-        include!("cxx-qt-gen/inheritance.cxxqt.h");
+        include!("directory/file_ident.cxxqt.h");
     }
     unsafe extern "C++" {
         #[doc = "The C++ type for the QObject "]
@@ -34,23 +37,27 @@ mod inheritance {
         type MyObjectRust;
     }
     extern "Rust" {
+        #[cxx_name = "data"]
         #[doc(hidden)]
-        #[cxx_name = "dataWrapper"]
         fn data(self: &MyObject, _index: &QModelIndex, _role: i32) -> QVariant;
     }
     extern "Rust" {
+        #[cxx_name = "hasChildren"]
         #[doc(hidden)]
-        #[cxx_name = "hasChildrenWrapper"]
         fn has_children(self: &MyObject, _parent: &QModelIndex) -> bool;
     }
     unsafe extern "C++" {
-        #[doc = " Inherited hasChildren from the base class"]
         #[cxx_name = "hasChildrenCxxQtInherit"]
+        #[doc = " Inherited hasChildren from the base class"]
         fn has_children_super(self: &MyObject, parent: &QModelIndex) -> bool;
     }
+    unsafe extern "C++" {
+        #[cxx_name = "helloWorldCxxQtInherit"]
+        fn hello_world(self: &MyObject, parent: &QModelIndex) -> bool;
+    }
     extern "C++" {
-        #[doc = " Inherited fetchMore from the base class"]
         #[cxx_name = "fetchMoreCxxQtInherit"]
+        #[doc = " Inherited fetchMore from the base class"]
         unsafe fn fetch_more(self: Pin<&mut MyObject>, index: &QModelIndex);
     }
     extern "Rust" {
@@ -59,33 +66,40 @@ mod inheritance {
         fn create_rs_my_object_rust() -> Box<MyObjectRust>;
     }
     unsafe extern "C++" {
-        #[cxx_name = "unsafeRust"]
         #[doc(hidden)]
-        fn cxx_qt_ffi_rust(self: &MyObject) -> &MyObjectRust;
+        #[cxx_name = "unsafeRust"]
+        #[namespace = "rust::cxxqt1"]
+        fn cxx_qt_ffi_my_object_unsafe_rust(outer: &MyObject) -> &MyObjectRust;
     }
     unsafe extern "C++" {
-        #[cxx_name = "unsafeRustMut"]
         #[doc(hidden)]
-        fn cxx_qt_ffi_rust_mut(self: Pin<&mut MyObject>) -> Pin<&mut MyObjectRust>;
+        #[cxx_name = "unsafeRustMut"]
+        #[namespace = "rust::cxxqt1"]
+        fn cxx_qt_ffi_my_object_unsafe_rust_mut(
+            outer: Pin<&mut MyObject>,
+        ) -> Pin<&mut MyObjectRust>;
     }
 }
-impl cxx_qt::Locking for inheritance::MyObject {}
+impl cxx_qt::Upcast<inheritance::QAbstractItemModel> for inheritance::MyObject {}
+#[allow(unused_imports)]
+#[allow(dead_code)]
+use inheritance::QAbstractItemModel as _;
 #[doc(hidden)]
 pub fn create_rs_my_object_rust() -> std::boxed::Box<MyObjectRust> {
     std::boxed::Box::new(core::default::Default::default())
 }
-impl core::ops::Deref for inheritance::MyObject {
+impl ::core::ops::Deref for inheritance::MyObject {
     type Target = MyObjectRust;
     fn deref(&self) -> &Self::Target {
-        self.cxx_qt_ffi_rust()
+        inheritance::cxx_qt_ffi_my_object_unsafe_rust(self)
     }
 }
-impl cxx_qt::CxxQtType for inheritance::MyObject {
+impl ::cxx_qt::CxxQtType for inheritance::MyObject {
     type Rust = MyObjectRust;
     fn rust(&self) -> &Self::Rust {
-        self.cxx_qt_ffi_rust()
+        inheritance::cxx_qt_ffi_my_object_unsafe_rust(self)
     }
     fn rust_mut(self: core::pin::Pin<&mut Self>) -> core::pin::Pin<&mut Self::Rust> {
-        self.cxx_qt_ffi_rust_mut()
+        inheritance::cxx_qt_ffi_my_object_unsafe_rust_mut(self)
     }
 }

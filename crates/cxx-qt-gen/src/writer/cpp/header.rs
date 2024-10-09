@@ -5,18 +5,9 @@
 
 use std::collections::BTreeSet;
 
-use crate::generator::cpp::{fragment::CppFragment, GeneratedCppBlocks};
-use crate::writer::{self, cpp::namespaced};
+use crate::generator::cpp::GeneratedCppBlocks;
+use crate::writer::cpp::{extract_extern_qt, namespaced, pair_as_header};
 use indoc::formatdoc;
-
-/// Extract the header from a given CppFragment
-fn pair_as_header(pair: &CppFragment) -> Option<String> {
-    match pair {
-        CppFragment::Pair { header, source: _ } => Some(header.clone()),
-        CppFragment::Header(header) => Some(header.clone()),
-        CppFragment::Source(_) => None,
-    }
-}
 
 /// With a given block name, join the given items and add them under the block
 fn create_block(block: &str, items: &[String]) -> String {
@@ -136,7 +127,7 @@ fn qobjects_header(generated: &GeneratedCppBlocks) -> Vec<String> {
 }
 
 /// For a given GeneratedCppBlocks write this into a C++ header
-pub fn write_cpp_header(generated: &GeneratedCppBlocks) -> String {
+pub fn write_cpp_header(generated: &GeneratedCppBlocks, include_path: &str) -> String {
     let includes = {
         let mut include_set = BTreeSet::new();
         include_set.extend(
@@ -162,18 +153,7 @@ pub fn write_cpp_header(generated: &GeneratedCppBlocks) -> String {
             .collect::<Vec<String>>()
             .join("\n")
     };
-    let extern_cxx_qt = generated
-        .extern_cxx_qt
-        .iter()
-        .flat_map(|block| {
-            block
-                .fragments
-                .iter()
-                .filter_map(pair_as_header)
-                .collect::<Vec<String>>()
-        })
-        .collect::<Vec<String>>()
-        .join("\n");
+    let extern_cxx_qt = extract_extern_qt(generated, pair_as_header);
 
     formatdoc! {r#"
         #pragma once
@@ -181,15 +161,13 @@ pub fn write_cpp_header(generated: &GeneratedCppBlocks) -> String {
         {includes}
 
         {forward_declare}
-        #include "{header_prefix}/{cxx_file_stem}.cxx.h"
+        #include "{include_path}.cxx.h"
 
         {extern_cxx_qt}
         {qobjects}
     "#,
-    cxx_file_stem = generated.cxx_file_stem,
     forward_declare = forward_declare(generated).join("\n"),
     qobjects = qobjects_header(generated).join("\n"),
-    header_prefix = writer::get_header_prefix()
     }
 }
 
@@ -197,13 +175,16 @@ pub fn write_cpp_header(generated: &GeneratedCppBlocks) -> String {
 mod tests {
     use super::*;
 
+    use crate::tests::format_cpp;
     use crate::writer::cpp::tests::{
         create_generated_cpp, create_generated_cpp_multi_qobjects,
         create_generated_cpp_no_namespace, expected_header, expected_header_multi_qobjects,
         expected_header_no_namespace,
     };
+    use crate::Parser;
     use indoc::indoc;
     use pretty_assertions::assert_str_eq;
+    use syn::{parse_quote, ItemMod};
 
     #[test]
     fn test_create_block() {
@@ -233,21 +214,78 @@ mod tests {
     #[test]
     fn test_write_cpp_header() {
         let generated = create_generated_cpp();
-        let output = write_cpp_header(&generated);
+        let output = write_cpp_header(&generated, "cxx-qt-gen/cxx_file_stem");
         assert_str_eq!(output, expected_header());
     }
 
     #[test]
     fn test_write_cpp_header_multi_qobjects() {
         let generated = create_generated_cpp_multi_qobjects();
-        let output = write_cpp_header(&generated);
+        let output = write_cpp_header(&generated, "cxx-qt-gen/cxx_file_stem");
         assert_str_eq!(output, expected_header_multi_qobjects());
     }
 
     #[test]
     fn test_write_cpp_header_no_namespace() {
         let generated = create_generated_cpp_no_namespace();
-        let output = write_cpp_header(&generated);
+        let output = write_cpp_header(&generated, "cxx-qt-gen/cxx_file_stem");
         assert_str_eq!(output, expected_header_no_namespace());
+    }
+
+    #[test]
+    fn test_write_cpp_header_no_qobject_macro() {
+        let module: ItemMod = parse_quote! {
+            #[cxx_qt::bridge]
+            mod ffi {
+                extern "C++" {
+                    type MyBase;
+                }
+
+                extern "RustQt" {
+                    #[base = MyBase]
+                    type MyObject = super::MyObjectRust;
+                }
+            }
+        };
+
+        let parser = Parser::from(module.clone()).unwrap();
+
+        let generated = GeneratedCppBlocks::from(&parser).unwrap();
+        let header = write_cpp_header(&generated, "cxx-qt-gen/ffi");
+        let expected = indoc! {r#"
+#pragma once
+
+#include <cxx-qt/type.h>
+
+class MyObject;
+
+
+
+
+#include "cxx-qt-gen/ffi.cxx.h"
+
+
+
+class MyObject : public MyBase, public ::rust::cxxqt1::CxxQtType<MyObjectRust>
+{
+
+public:
+
+
+  virtual ~MyObject() = default;
+
+public:
+  explicit MyObject();
+
+
+};
+
+
+
+
+
+"#};
+
+        assert_str_eq!(format_cpp(&header), format_cpp(expected))
     }
 }

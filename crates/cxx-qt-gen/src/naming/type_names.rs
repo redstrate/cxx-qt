@@ -2,25 +2,17 @@
 // SPDX-FileContributor: Leon Matthes <leon.matthes@kdab.com>
 //
 // SPDX-License-Identifier: MIT OR Apache-2.0
-
-use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
-
-use quote::format_ident;
-use syn::{
-    parse_quote, token::Brace, Attribute, Error, Ident, Item, ItemEnum, ItemForeignMod, ItemStruct,
-    Path, Result,
-};
-
-use crate::{
-    parser::qobject::ParsedQObject,
-    syntax::{
-        attribute::attribute_find_path, expr::expr_to_string,
-        foreignmod::foreign_mod_to_foreign_item_types,
-    },
-};
-
 use super::Name;
-use crate::parser::cxxqtdata::ParsedCxxQtData;
+use crate::syntax::attribute::attribute_get_path;
+use crate::{
+    parser::{cxxqtdata::ParsedCxxQtData, qobject::ParsedQObject},
+    syntax::{expr::expr_to_string, foreignmod::foreign_mod_to_foreign_item_types},
+};
+use quote::{format_ident, quote};
+use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
+use syn::{
+    parse_quote, Attribute, Error, Ident, Item, ItemEnum, ItemForeignMod, ItemStruct, Path, Result,
+};
 
 /// The purpose of this struct is to store all nameable types.
 ///
@@ -111,7 +103,7 @@ impl Default for TypeNames {
 }
 
 impl TypeNames {
-    /// Part of the The "Naming" phase.
+    /// Part of the "Naming" phase.
     /// Extract all nameable types from the CXX-Qt data and the CXX items.
     ///
     /// This allows the generator to fully-qualify all types in the generated code.
@@ -159,27 +151,41 @@ impl TypeNames {
         bridge_namespace: Option<&str>,
         module_ident: &Ident,
     ) -> Result<()> {
-        for qobject in cxx_qt_data.qobjects.values() {
+        // Find and register the QObjects in the bridge
+        for qobject in cxx_qt_data.qobjects.iter() {
             self.populate_qobject(qobject)?;
         }
 
+        // Find and register the names of any QEnums in the bridge
         for qenum in &cxx_qt_data.qenums {
             self.insert(qenum.name.clone())?;
         }
 
         for extern_cxxqt in &cxx_qt_data.extern_cxxqt_blocks {
-            // TODO: Refactor, this is a hack to reconstruct the original ItemForeignMod
-            let foreign_mod = ItemForeignMod {
-                attrs: extern_cxxqt.attrs.clone(),
-                unsafety: None,
-                brace_token: Brace::default(),
-                items: extern_cxxqt.passthrough_items.clone(),
-                abi: syn::Abi {
-                    extern_token: syn::parse_quote!(extern),
-                    name: None,
-                },
+            let namespace = if let Some(namespace) = &extern_cxxqt.namespace {
+                quote! { #[namespace = #namespace ] }
+            } else {
+                quote! {}
+            };
+
+            let items = extern_cxxqt.passthrough_items.clone();
+            let foreign_mod: ItemForeignMod = parse_quote! {
+                #namespace
+                extern "C++" {
+                    #(#items)*
+                }
             };
             self.populate_from_foreign_mod_item(&foreign_mod, bridge_namespace, module_ident)?;
+
+            // Find and register the names of any qobjects in extern "C++Qt"
+            for qobject in extern_cxxqt.qobjects.iter() {
+                self.insert(qobject.name.clone())?;
+            }
+
+            // Find and register the names of any signals in extern "C++Qt"
+            for signal in extern_cxxqt.signals.iter() {
+                self.insert(signal.name.clone())?;
+            }
         }
 
         Ok(())
@@ -193,10 +199,8 @@ impl TypeNames {
     ) -> Result<()> {
         // Retrieve a namespace from the mod or the bridge
         let block_namespace =
-            if let Some(index) = attribute_find_path(&foreign_mod.attrs, &["namespace"]) {
-                Some(expr_to_string(
-                    &foreign_mod.attrs[index].meta.require_name_value()?.value,
-                )?)
+            if let Some(attr) = attribute_get_path(&foreign_mod.attrs, &["namespace"]) {
+                Some(expr_to_string(&attr.meta.require_name_value()?.value)?)
             } else {
                 bridge_namespace.map(str::to_owned)
             };
@@ -215,7 +219,7 @@ impl TypeNames {
                     if !this.shared_types.contains(&name.rust)
                         || this.extern_types.contains(&name.rust)
                     {
-                        return Err(this.duplicate_type(&name.rust));
+                        return Err(this.err_duplicate_type(&name.rust));
                     }
                     this.check_duplicate_compatability(&name)
                 },
@@ -232,7 +236,7 @@ impl TypeNames {
             Err(Error::new_spanned(
                 &duplicate.rust,
                 format!(
-                    "The type `{}` is defined multiple times with different mappings",
+                    "The type `{}` is defined multiple times with different mappings!",
                     duplicate.rust
                 ),
             ))
@@ -261,7 +265,7 @@ impl TypeNames {
                     if !this.extern_types.contains(&name.rust)
                         || this.shared_types.contains(&name.rust)
                     {
-                        return Err(this.duplicate_type(&name.rust));
+                        return Err(this.err_duplicate_type(&name.rust));
                     }
                     this.check_duplicate_compatability(&name)
                 })?;
@@ -278,7 +282,7 @@ impl TypeNames {
         Ok(())
     }
 
-    fn unknown_type(&self, ident: &Ident) -> Error {
+    fn err_unknown_type(&self, ident: &Ident) -> Error {
         Error::new_spanned(ident, format!("Undeclared type: `{ident}`!"))
     }
 
@@ -288,13 +292,13 @@ impl TypeNames {
     pub fn lookup(&self, ident: &Ident) -> Result<&Name> {
         self.names
             .get(ident)
-            .ok_or_else(|| self.unknown_type(ident))
+            .ok_or_else(|| self.err_unknown_type(ident))
     }
 
     /// For a given rust ident return the CXX name with its namespace
     ///
     /// Ideally we'd want this type name to always be **fully** qualified, starting with `::`.
-    /// Unfortunately, this isn't always possible, as the Qt5 meta object system doesn't register
+    /// Unfortunately, this isn't always possible, as the Qt5 metaobject system doesn't register
     /// types with the fully qualified path :(
     /// E.g. it will recognize `QString`, but not `::QString` from QML.
     ///
@@ -315,7 +319,7 @@ impl TypeNames {
         self.lookup(ident).map(|name| name.namespace.clone())
     }
 
-    /// Return a qualified version of the ident that can by used to refer to the type T outside of a CXX bridge
+    /// Return a qualified version of the ident that can be used to refer to the type T outside a CXX bridge
     ///
     /// Eg MyObject -> ffi::MyObject
     ///
@@ -325,7 +329,7 @@ impl TypeNames {
         self.lookup(ident).map(Name::rust_qualified)
     }
 
-    fn duplicate_type(&self, ident: &Ident) -> Error {
+    fn err_duplicate_type(&self, ident: &Ident) -> Error {
         Error::new_spanned(
             ident,
             format!("The type name `{ident}` is defined multiple times"),
@@ -346,7 +350,7 @@ impl TypeNames {
             attrs,
             parent_namespace,
             module_ident,
-            |this, name| Err(this.duplicate_type(&name.rust)),
+            |this, name| Err(this.err_duplicate_type(&name.rust)),
         )
     }
 
@@ -375,7 +379,7 @@ impl TypeNames {
         let entry = self.names.entry(name.rust.clone());
 
         match entry {
-            Entry::Occupied(_) => Err(self.duplicate_type(&name.rust)),
+            Entry::Occupied(_) => Err(self.err_duplicate_type(&name.rust)),
             Entry::Vacant(entry) => {
                 entry.insert(name);
                 Ok(())
@@ -549,6 +553,20 @@ mod tests {
     }
 
     #[test]
+    fn test_invalid_namespace() {
+        let items = [parse_quote! {
+            extern "RustQt" {
+                #[namespace = 2]
+                type A = super::RustA;
+            }
+        }];
+        let mut types = TypeNames::default();
+        assert!(types
+            .populate_from_cxx_items(&items, None, &format_ident!("ffi"))
+            .is_err());
+    }
+
+    #[test]
     fn test_qualified() {
         let mut types = TypeNames::default();
         let ident = format_ident!("A");
@@ -564,6 +582,22 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_fallback_population() {
+        let item: Item = parse_quote! {
+            struct MyStruct {}
+        };
+
+        let mut types = TypeNames::default();
+        assert!(types
+            .populate_from_cxx_items(&[item.clone()], None, &format_ident!("ffi"))
+            .is_ok());
+
+        assert!(types
+            .populate_from_cxx_items(&[item], None, &format_ident!("ffi"))
+            .is_err());
+    }
+
     fn parse_cxx_item(item: Item) -> TypeNames {
         let mut type_names = TypeNames::default();
         assert!(type_names
@@ -574,7 +608,6 @@ mod tests {
 
     #[test]
     fn test_cxx_items_cxx_name() {
-        // TODO
         let item: Item = parse_quote! {
             unsafe extern "C++" {
                 #[cxx_name = "B"]
@@ -591,6 +624,20 @@ mod tests {
             type_names.rust_qualified(&ident).unwrap(),
             parse_quote! { ffi::A }
         );
+    }
+
+    #[test]
+    fn test_cxx_items_invalid_namespace() {
+        let item: Item = parse_quote! {
+            extern "C++" {
+                #[namespace = 3]
+                type F;
+            }
+        };
+        let mut types = TypeNames::default();
+        assert!(types
+            .populate_from_item(&item, None, &format_ident!("ffi"))
+            .is_err());
     }
 
     #[test]
@@ -732,11 +779,47 @@ mod tests {
                     type B;
                 }
             },
+            parse_quote! {
+                extern "C++" { type T; }
+            },
+            parse_quote! {
+                struct T;
+            },
         ];
 
+        // Duplicate types in foreign items
         let mut types = TypeNames::default();
         assert!(types
             .populate_from_cxx_items(&items, None, &format_ident!("ffi"))
+            .is_err());
+
+        // Duplicate types in items
+        let mut types = TypeNames::default();
+        assert!(types
+            .populate_from_item(&items[2], None, &format_ident!("ffi"))
+            .is_ok());
+
+        assert!(types
+            .populate_from_item(&items[3], None, &format_ident!("ffi"))
+            .is_ok());
+
+        // Bare duplicate Name insertion
+        let mut types = TypeNames::default();
+        assert!(types
+            .insert(Name {
+                rust: format_ident!("my_struct"),
+                cxx: None,
+                module: None,
+                namespace: None,
+            })
+            .is_ok());
+        assert!(types
+            .insert(Name {
+                rust: format_ident!("my_struct"),
+                cxx: None,
+                module: None,
+                namespace: None,
+            })
             .is_err());
     }
 
@@ -767,6 +850,25 @@ mod tests {
     }
 
     #[test]
+    fn test_shared_type() {
+        let items = [parse_quote! {
+            mod ffi {
+                enum MyEnum {
+                    Yes,
+                    No
+                }
+                extern "C++" {
+                    type MyEnum;
+                }
+            }
+        }];
+        let mut types = TypeNames::default();
+        assert!(types
+            .populate_from_cxx_items(&items, None, &format_ident!("ffi"))
+            .is_ok());
+    }
+
+    #[test]
     fn test_extern_shared_type_incompatible() {
         let items = [
             parse_quote! {
@@ -784,5 +886,20 @@ mod tests {
         assert!(types
             .populate_from_cxx_items(&items, None, &format_ident!("ffi"))
             .is_err());
+    }
+
+    #[test]
+    fn test_populate_from_foreign_mod_invalid_namespace() {
+        let item_mod: ItemForeignMod = parse_quote! {
+            #[namespace=3]
+            extern "RustQt" {
+                fn my_fn();
+            }
+        };
+
+        let mut types = TypeNames::default();
+        assert!(types
+            .populate_from_foreign_mod_item(&item_mod, None, &format_ident!("ffi"))
+            .is_err())
     }
 }

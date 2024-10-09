@@ -10,7 +10,7 @@ fn main() {
         .file("src/empty.rs")
         .file("src/data.rs")
         .file("src/lib.rs")
-        .file("src/locking.rs")
         .file("src/types.rs")
+        .file("src/naming.rs")
         .build();
 }

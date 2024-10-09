@@ -32,10 +32,6 @@ pub fn generate(
             let qobject_name = type_names.lookup(&signal.qobject_ident)?;
             let data = generate_cpp_signal(signal, qobject_name, type_names)?;
             block.includes = data.includes;
-            // Ensure that we include MaybeLockGuard<T> that is used in multiple places
-            block
-                .includes
-                .insert("#include <cxx-qt/maybelockguard.h>".to_owned());
             block.forward_declares = data.forward_declares;
             block.fragments = data.fragments;
             debug_assert!(data.methods.is_empty());
@@ -48,24 +44,29 @@ pub fn generate(
 
 #[cfg(test)]
 mod tests {
+    use quote::format_ident;
     use syn::parse_quote;
 
     use super::*;
 
     #[test]
     fn test_generate_cpp_extern_qt() {
-        let blocks = vec![ParsedExternCxxQt::parse(parse_quote! {
-            unsafe extern "C++Qt" {
-                #[qobject]
-                type MyObject;
+        let blocks = vec![ParsedExternCxxQt::parse(
+            parse_quote! {
+                unsafe extern "C++Qt" {
+                    #[qobject]
+                    type MyObject;
 
-                #[qsignal]
-                fn signal1(self: Pin<&mut MyObject>);
+                    #[qsignal]
+                    fn signal1(self: Pin<&mut MyObject>);
 
-                #[qsignal]
-                fn signal2(self: Pin<&mut MyObject>);
-            }
-        })
+                    #[qsignal]
+                    fn signal2(self: Pin<&mut MyObject>);
+                }
+            },
+            &format_ident!("qobject"),
+            None,
+        )
         .unwrap()];
 
         // Unknown types
@@ -77,17 +78,21 @@ mod tests {
 
     #[test]
     fn test_generate_cpp_extern_qt_mapping() {
-        let blocks = vec![ParsedExternCxxQt::parse(parse_quote! {
-            unsafe extern "C++Qt" {
-                #[cxx_name = "ObjCpp"]
-                #[namespace = "mynamespace"]
-                #[qobject]
-                type ObjRust;
+        let blocks = vec![ParsedExternCxxQt::parse(
+            parse_quote! {
+                unsafe extern "C++Qt" {
+                    #[cxx_name = "ObjCpp"]
+                    #[namespace = "mynamespace"]
+                    #[qobject]
+                    type ObjRust;
 
-                #[qsignal]
-                fn signal(self: Pin<&mut ObjRust>);
-            }
-        })
+                    #[qsignal]
+                    fn signal(self: Pin<&mut ObjRust>);
+                }
+            },
+            &format_ident!("qobject"),
+            None,
+        )
         .unwrap()];
         let mut type_names = TypeNames::default();
         type_names.mock_insert("ObjRust", None, Some("ObjCpp"), Some("mynamespace"));

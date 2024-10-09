@@ -7,6 +7,9 @@
 name: cxx-qt tests
 on:
   push:
+    branches:
+      - 'main'
+      - '[0-9]+\.[0-9]+\.x'
   pull_request:
   schedule:
     # Run daily at 01:01
@@ -21,8 +24,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: sudo apt-get update && sudo apt-get install -y clang-format-12
-      - run: ./scripts/clang_format_check.sh .
+      # Note ensure that matrix runner is updated too
+      - run: |
+          pip install --user clang-format==18.1.8
+          test -x ~/.local/bin/clang-format
+          test -x /home/runner/.local/bin/clang-format
+      - run: ./scripts/clang_format_check.sh /home/runner/.local/bin/clang-format .
 
   license_check:
     runs-on: ubuntu-latest
@@ -42,13 +49,174 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: DavidAnson/markdownlint-cli2-action@v16
+      - uses: DavidAnson/markdownlint-cli2-action@v17
         with:
           globs: '**/*.md'
 
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Shellcheck is likely already installed but lets ensure it is
+      - name: install shellcheck
+        run: sudo apt-get install -y shellcheck
+      - name: shellcheck
+        run: shellcheck scripts/*.sh
+
+  coverage:
+    # Run after pre checks
+    needs: [ clang_format, license_check, rust_format_check, markdown_lint, shellcheck ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup toolchain
+        run: |
+          cargo install grcov
+          rustup component add llvm-tools
+      - name: build
+        env:
+          RUSTFLAGS: -Cinstrument-coverage
+          LLVM_PROFILE_FILE: coverage/coverage_data-%p-%m.profraw
+        run: cargo build --package cxx-qt-gen
+      - name: test
+        env:
+          RUSTFLAGS: -Cinstrument-coverage
+          LLVM_PROFILE_FILE: coverage/coverage_data-%p-%m.profraw
+        run: cargo test --lib --package cxx-qt-gen
+      - name: generate-report
+        run: grcov . -s . --binary-path ./target/debug/ -t lcov --branch --ignore-not-existing -o ./target/debug/lcov.info --excl-start CODECOV_EXCLUDE_START --excl-stop CODECOV_EXCLUDE_STOP
+      - name: upload-report
+        uses: codecov/codecov-action@v4
+        with:
+          directory: ./target/debug/
+          files: lcov.info
+          fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+          verbose: true
+
+  build-wasm:
+    name: Ubuntu 22.04 (wasm_32) Qt 6
+    needs: [clang_format, license_check, rust_format_check, markdown_lint, shellcheck]
+    runs-on: ubuntu-22.04
+    env:
+      SCCACHE_CACHE_SIZE: 600M
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+      - name: Setup toolchain
+        run: |
+          rustup component add clippy rustfmt
+          rustup target add wasm32-unknown-emscripten
+      - name: "Rust tools cache"
+        uses: actions/cache@v4
+        id: rust-tools-cache
+        with:
+          path: |
+            ~/.cargo/bin/sccache
+            ~/.cargo/bin/mdbook
+            ~/.cargo/bin/mdbook-linkcheck
+          key: ubuntu-22.04_sccache-0.7.6_mdbook-0.4.36_mdbook-linkcheck-0.7.7
+      - name: "Build Rust tools"
+        if: steps.rust-tools-cache.outputs.cache-hit != 'true'
+        # Do not build with storage backends enabled, we only need local
+        run: |
+          cargo install --no-default-features sccache
+          cargo install mdbook mdbook-linkcheck
+      # We want our compiler cache to always update to the newest state.
+      # The best way for us to achieve this is to **always** update the cache after every landed commit.
+      # That way it will closely follow our development.
+      # And if a PR diverges a lot with its cache that's not a big deal, as it will be merged eventually.
+      #
+      # This is a workaround for the fact that GH doesn't support updating existing caches.
+      # See: https://github.com/azu/github-actions-overwrite-cache-example
+      #
+      # Ideally we'd like to use this:
+      # - name: "Compiler cache"
+      #   uses: actions/cache@v4
+      #   with:
+      #     update: true <------- THIS DOESN'T EXIST YET
+      #     path: /home/runner/.cache/sccache
+      #     key: "Ubuntu 22.04 (wasm_32) Qt6_compiler_cache"
+      - name: "Restore Compiler Cache"
+        id: compiler-cache-restore
+        uses: actions/cache/restore@v4
+        with:
+          path: /home/runner/.cache/sccache
+          key: "Ubuntu 22.04 (wasm_32) Qt6_compiler_cache"
+      - name: "emsdk cache"
+        uses: actions/cache@v4
+        id: emsdk-cache
+        with:
+          path: ./emsdk
+          key: emsdk_2.0.14
+      - name: "Setup emsdk"
+        if: steps.emsdk-cache.outputs.cache-hit != 'true'
+        run: |
+          git clone https://github.com/emscripten-core/emsdk
+          ./emsdk/emsdk install 2.0.14
+          ./emsdk/emsdk activate 2.0.14
+      - name: "Install Dependencies"
+        run: sudo apt-get update && sudo apt-get install -y ninja-build clang-format-12
+      - name: Install Qt WASM & Desktop
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.2.4'
+          host: 'linux'
+          target: 'desktop'
+          arch: 'wasm_32'
+          tools: 'tools_cmake'
+          cache: true
+      - name: "Configure"
+        # FIXME: ninja is not being found?
+        env:
+          RUSTC_WRAPPER: sccache
+        run: |
+          source ./emsdk/emsdk_env.sh
+          /home/runner/work/cxx-qt/Qt/6.2.4/wasm_32/bin/qt-cmake -DQT_HOST_PATH=/home/runner/work/cxx-qt/Qt/6.2.4/gcc_64 -DBUILD_WASM=ON -Bbuild .
+      - name: "Build"
+        env:
+          RUSTC_WRAPPER: sccache
+        run: cmake --build build --parallel 4
+      - name: Test output files exist
+        run: |
+          test -f ./build/examples/qml_minimal/example_qml_minimal.html
+          test -f ./build/examples/qml_minimal/example_qml_minimal.js
+          test -f ./build/examples/qml_minimal/libqml_minimal.a
+          test -x ./build/examples/qml_minimal/example_qml_minimal.wasm
+          test -f ./build/examples/qml_minimal/qtloader.js
+          test -f ./build/examples/qml_features/example_qml_features.html
+          test -f ./build/examples/qml_features/example_qml_features.js
+          test -f ./build/examples/qml_features/libqml_features.a
+          test -x ./build/examples/qml_features/example_qml_features.wasm
+          test -f ./build/examples/qml_features/qtloader.js
+      - name: "Print compiler cache statistics"
+        run: sccache --show-stats
+      # This is a workaround for the fact that GH doesn't support updating existing caches.
+      # See: https://github.com/azu/github-actions-overwrite-cache-example
+      - name: "Delete previous compiler cache"
+        # Updating th cache doesn't work from forks
+        # So update it once it's merged into the repo
+        if: ${{ steps.compiler-cache-restore.outputs.cache-hit &&  github.event_name == 'push' }}
+        working-directory: /home/runner/cxx-qt
+        continue-on-error: true
+        run: |
+          gh extension install actions/gh-actions-cache
+          gh actions-cache delete "Ubuntu 22.04 (wasm_32) Qt6_compiler_cache" --confirm
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: "Save Compiler Cache"
+        # Updating th cache doesn't work from forks
+        # So update it once it's merged into the repo
+        if: ${{ github.event_name == 'push' }}
+        uses: actions/cache/save@v4
+        with:
+          path: /home/runner/.cache/sccache
+          key: "Ubuntu 22.04 (wasm_32) Qt6_compiler_cache"
+
   build:
     # Run after pre checks
-    needs: [clang_format, license_check, rust_format_check, markdown_lint]
+    needs: [clang_format, license_check, rust_format_check, markdown_lint, shellcheck]
     strategy:
       fail-fast: false
       matrix:
@@ -64,6 +232,7 @@ jobs:
             ctest_args: --exclude-regex '^(example_qml_features_test_valgrind|example_qml_minimal_myobject_test_valgrind)$'
             qt_qpa_platform: offscreen
             compiler_cache_path: /home/runner/.cache/sccache
+            clang_format_path: /home/runner/.local/bin/clang-format
             cargo_dir: ~/.cargo
             packages-extra: >-
                 qtbase5-dev
@@ -84,6 +253,7 @@ jobs:
             ctest_args: --exclude-regex '^(example_qml_features_test_valgrind|example_qml_minimal_myobject_test_valgrind)$'
             qt_qpa_platform: offscreen
             compiler_cache_path: /home/runner/.cache/sccache
+            clang_format_path: /home/runner/.local/bin/clang-format
             cargo_dir: ~/.cargo
             packages-extra: >-
                 qt6-base-dev
@@ -106,14 +276,10 @@ jobs:
             cores: 3
             # FIXME: qmltestrunner fails to import QtQuick module
             # https://github.com/KDAB/cxx-qt/issues/110
-            #
-            # FIXME: clang-format-14 causes formatting differences if it is selected by brew
-            # once Ubuntu 22.04 is we can move to clang-format-14 everywhere
-            # for now we need at least clang-format-12 otherwise include reordering fails after clang-format off
-            # https://github.com/KDAB/cxx-qt/issues/121
             ctest_args: --exclude-regex '^(cargo_clippy|cargo_doc|example_qml_features_test|example_qml_minimal_myobject_test|cargo_build_rerun|.*valgrind)$'
             qt_qpa_platform: cocoa
             compiler_cache_path: /Users/runner/Library/Caches/Mozilla.sccache
+            clang_format_path: /Users/runner/Library/Python/3.12/bin/clang-format
             cargo_dir: ~/.cargo
             workspace: /Users/runner/cxx-qt
             cc: clang
@@ -129,6 +295,7 @@ jobs:
             ctest_args: --exclude-regex '^(cargo_clippy|cargo_doc|example_qml_features_test|example_qml_minimal_myobject_test|cargo_build_rerun|.*valgrind)$'
             qt_qpa_platform: cocoa
             compiler_cache_path: /Users/runner/Library/Caches/Mozilla.sccache
+            clang_format_path: /Users/runner/Library/Python/3.12/bin/clang-format
             cargo_dir: ~/.cargo
             workspace: /Users/runner/cxx-qt
             cc: clang
@@ -146,6 +313,7 @@ jobs:
             exe_suffix: .exe
             qt_qpa_platform: windows
             compiler_cache_path: C:\Users\runneradmin\AppData\Local\Mozilla\sccache\cache
+            clang_format_path: C:\Users\runneradmin\AppData\Roaming\Python\Python39\Scripts\clang-format.exe
             cargo_dir: C:\Users\runneradmin\.cargo
             cc: cl
             cxx: cl
@@ -163,6 +331,7 @@ jobs:
             exe_suffix: .exe
             qt_qpa_platform: windows
             compiler_cache_path: C:\Users\runneradmin\AppData\Local\Mozilla\sccache\cache
+            clang_format_path: C:\Users\runneradmin\AppData\Roaming\Python\Python39\Scripts\clang-format.exe
             cargo_dir: C:\Users\runneradmin\.cargo
             cc: cl
             cxx: cl
@@ -234,13 +403,18 @@ jobs:
         path: ${{ matrix.compiler_cache_path }}
         key: ${{ matrix.name }}_compiler_cache
 
+    - name: "Install clang-format"
+      # Note ensure that clang-format runner is updated too
+      run: |
+        pip install --user clang-format==18.1.8
+        test -x ${{ matrix.clang_format_path }}
+
     - name: "[Ubuntu] Install dependencies"
       if: runner.os == 'Linux'
       run: >-
         sudo apt-get update &&
         sudo apt-get install -y
         ninja-build
-        clang-format-12
         libssl-dev
         pkg-config
         valgrind
@@ -253,13 +427,8 @@ jobs:
 
     - name: "[macOS] Install dependencies"
       if: runner.os == 'macOS'
-      # FIXME: clang-format-14 causes formatting differences if it is selected by brew
-      # once Ubuntu 22.04 is we can move to clang-format-14 everywhere
-      # for now we need at least clang-format-12 otherwise include reordering fails after clang-format off
-      # https://github.com/KDAB/cxx-qt/issues/121
-      #
       # automake is needed for building libicu which is a dependency of Qt
-      run: brew install automake autoconf-archive ninja clang-format
+      run: brew install automake autoconf-archive ninja
 
     # Note that for nuget uploads to work this must be run as the kdab user
     # eg a branch on the kdab repo rather than a users fork
@@ -309,6 +478,8 @@ jobs:
       run: ctest ${{ matrix.ctest_args }} -C Release -T test --output-on-failure --parallel ${{ matrix.cores }}
       working-directory: ${{ matrix.workspace }}/build
       env:
+        # Use the version of clang-format from pip
+        CLANG_FORMAT_BINARY: ${{ matrix.clang_format_path }}
         RUSTC_WRAPPER: sccache
         QT_QPA_PLATFORM: ${{ matrix.qt_qpa_platform }}
         QT_SELECT: qt${{ matrix.qt_version }}

@@ -26,14 +26,49 @@ pub fn namespaced(namespace: &str, cpp_code: &str) -> String {
 }
 
 /// For a given GeneratedCppBlocks write this into a C++ header and source pair
-pub fn write_cpp(generated: &GeneratedCppBlocks) -> CppFragment {
-    let header = write_cpp_header(generated);
-    let source = write_cpp_source(generated);
+pub fn write_cpp(generated: &GeneratedCppBlocks, include_path: &str) -> CppFragment {
+    let header = write_cpp_header(generated, include_path);
+    let source = write_cpp_source(generated, include_path);
 
     CppFragment::Pair {
         header: clang_format_with_style(&header, &ClangFormatStyle::File).unwrap_or(header),
         source: clang_format_with_style(&source, &ClangFormatStyle::File).unwrap_or(source),
     }
+}
+/// Extract the header from a given CppFragment
+pub fn pair_as_header(pair: &CppFragment) -> Option<String> {
+    match pair {
+        CppFragment::Pair { header, source: _ } => Some(header.clone()),
+        CppFragment::Header(header) => Some(header.clone()),
+        CppFragment::Source(_) => None,
+    }
+}
+
+/// Extract the source from a given CppFragment
+pub fn pair_as_source(pair: &CppFragment) -> Option<String> {
+    match pair {
+        CppFragment::Pair { header: _, source } => Some(source.clone()),
+        CppFragment::Header(_) => None,
+        CppFragment::Source(source) => Some(source.clone()),
+    }
+}
+
+pub fn extract_extern_qt(
+    generated: &GeneratedCppBlocks,
+    mut filter_fn: impl FnMut(&CppFragment) -> Option<String>,
+) -> String {
+    generated
+        .extern_cxx_qt
+        .iter()
+        .flat_map(|block| {
+            block
+                .fragments
+                .iter()
+                .filter_map(&mut filter_fn)
+                .collect::<Vec<String>>()
+        })
+        .collect::<Vec<String>>()
+        .join("\n")
 }
 
 #[cfg(test)]
@@ -42,6 +77,7 @@ mod tests {
 
     use super::*;
 
+    use crate::generator::cpp::property::tests::require_pair;
     use crate::{
         generator::cpp::qobject::{GeneratedCppQObject, GeneratedCppQObjectBlocks},
         naming::Name,
@@ -59,7 +95,6 @@ mod tests {
         GeneratedCppBlocks {
             forward_declares: vec![],
             includes: BTreeSet::default(),
-            cxx_file_stem: "cxx_file_stem".to_owned(),
             extern_cxx_qt: vec![],
             qobjects: vec![
                 GeneratedCppQObject {
@@ -190,7 +225,6 @@ mod tests {
         GeneratedCppBlocks {
             forward_declares: vec![],
             includes: BTreeSet::default(),
-            cxx_file_stem: "cxx_file_stem".to_owned(),
             extern_cxx_qt: vec![],
             qobjects: vec![
                 GeneratedCppQObject {
@@ -662,11 +696,8 @@ mod tests {
     #[test]
     fn test_write_cpp() {
         let generated = create_generated_cpp();
-        let (header, source) = if let CppFragment::Pair { header, source } = write_cpp(&generated) {
-            (header, source)
-        } else {
-            panic!("Expected Pair")
-        };
+        let (header, source) =
+            require_pair(&write_cpp(&generated, "cxx-qt-gen/cxx_file_stem")).unwrap();
         assert_str_eq!(header, format_cpp(expected_header()));
         assert_str_eq!(source, format_cpp(expected_source()));
     }
@@ -674,11 +705,8 @@ mod tests {
     #[test]
     fn test_write_cpp_multi_qobjects() {
         let generated = create_generated_cpp_multi_qobjects();
-        let (header, source) = if let CppFragment::Pair { header, source } = write_cpp(&generated) {
-            (header, source)
-        } else {
-            panic!("Expected Pair")
-        };
+        let (header, source) =
+            require_pair(&write_cpp(&generated, "cxx-qt-gen/cxx_file_stem")).unwrap();
         assert_str_eq!(header, format_cpp(expected_header_multi_qobjects()));
         assert_str_eq!(source, format_cpp(expected_source_multi_qobjects()));
     }
@@ -686,11 +714,8 @@ mod tests {
     #[test]
     fn test_write_cpp_no_namespace() {
         let generated = create_generated_cpp_no_namespace();
-        let (header, source) = if let CppFragment::Pair { header, source } = write_cpp(&generated) {
-            (header, source)
-        } else {
-            panic!("Expected Pair")
-        };
+        let (header, source) =
+            require_pair(&write_cpp(&generated, "cxx-qt-gen/cxx_file_stem")).unwrap();
         assert_str_eq!(header, format_cpp(expected_header_no_namespace()));
         assert_str_eq!(source, format_cpp(expected_source_no_namespace()));
     }

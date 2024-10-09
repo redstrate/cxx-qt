@@ -1,6 +1,4 @@
 #[cxx::bridge(namespace = "cxx_qt::multi_object")]
-#[attrA]
-#[attrB]
 pub mod ffi {
     const MAX: u16 = 65535;
     enum Event {
@@ -23,8 +21,8 @@ pub mod ffi {
     #[namespace = "namespace"]
     extern "C" {}
     #[namespace = "namespace"]
-    #[custom_attr = "test"]
     extern "C" {}
+    #[custom_attr = "test"]
     unsafe extern "C++" {}
     #[namespace = "namespace"]
     unsafe extern "C++" {}
@@ -51,8 +49,10 @@ pub mod ffi {
         y: B,
     }
     use super::MyTrait;
+    #[namespace = ""]
     unsafe extern "C++" {
         include ! (< QtCore / QStringListModel >);
+        type QStringListModel;
     }
     unsafe extern "C++" {
         include ! (< QtCore / QObject >);
@@ -60,14 +60,16 @@ pub mod ffi {
         #[doc(hidden)]
         #[namespace = "Qt"]
         #[rust_name = "CxxQtConnectionType"]
+        #[allow(dead_code)]
         type ConnectionType = cxx_qt::ConnectionType;
         #[doc(hidden)]
         #[namespace = "rust::cxxqt1"]
         #[rust_name = "CxxQtQMetaObjectConnection"]
+        #[allow(dead_code)]
         type QMetaObjectConnection = cxx_qt::QMetaObjectConnection;
     }
     unsafe extern "C++" {
-        include!("cxx-qt-gen/multi_object.cxxqt.h");
+        include!("directory/file_ident.cxxqt.h");
     }
     unsafe extern "C++" {
         #[doc = "The C++ type for the QObject "]
@@ -80,19 +82,23 @@ pub mod ffi {
         type MyObject;
     }
     extern "Rust" {
+        #[namespace = "cxx_qt::multi_object"]
         type MyObjectRust;
     }
     extern "Rust" {
-        #[cxx_name = "getPropertyNameWrapper"]
+        #[cxx_name = "getPropertyName"]
+        #[namespace = "cxx_qt::multi_object"]
         unsafe fn property_name<'a>(self: &'a MyObject) -> &'a i32;
     }
     extern "Rust" {
-        #[cxx_name = "setPropertyNameWrapper"]
+        #[cxx_name = "setPropertyName"]
+        #[namespace = "cxx_qt::multi_object"]
         fn set_property_name(self: Pin<&mut MyObject>, value: i32);
     }
     unsafe extern "C++" {
-        #[doc = "Notify for the Q_PROPERTY"]
         #[cxx_name = "propertyNameChanged"]
+        #[doc = "Notify for the Q_PROPERTY"]
+        #[namespace = "cxx_qt::multi_object"]
         fn property_name_changed(self: Pin<&mut MyObject>);
     }
     unsafe extern "C++" {
@@ -124,12 +130,14 @@ pub mod ffi {
         );
     }
     extern "Rust" {
+        #[cxx_name = "invokableName"]
+        #[namespace = "cxx_qt::multi_object"]
         #[doc(hidden)]
-        #[cxx_name = "invokableNameWrapper"]
         fn invokable_name(self: Pin<&mut MyObject>);
     }
     unsafe extern "C++" {
         #[cxx_name = "ready"]
+        #[namespace = "cxx_qt::multi_object"]
         fn ready(self: Pin<&mut MyObject>);
     }
     unsafe extern "C++" {
@@ -162,45 +170,18 @@ pub mod ffi {
         fn create_rs_my_object_rust() -> Box<MyObjectRust>;
     }
     unsafe extern "C++" {
+        #[doc(hidden)]
         #[cxx_name = "unsafeRust"]
-        #[doc(hidden)]
-        fn cxx_qt_ffi_rust(self: &MyObject) -> &MyObjectRust;
+        #[namespace = "rust::cxxqt1"]
+        fn cxx_qt_ffi_my_object_unsafe_rust(outer: &MyObject) -> &MyObjectRust;
     }
     unsafe extern "C++" {
+        #[doc(hidden)]
         #[cxx_name = "unsafeRustMut"]
-        #[doc(hidden)]
-        fn cxx_qt_ffi_rust_mut(self: Pin<&mut MyObject>) -> Pin<&mut MyObjectRust>;
-    }
-    unsafe extern "C++" {
-        #[doc = "The C++ type for the QObject "]
-        #[doc = "ThirdObjectRust"]
-        #[doc = "\n"]
-        #[doc = "Use this type when referring to the QObject as a pointer"]
-        #[doc = "\n"]
-        #[doc = "See the book for more information: <https://kdab.github.io/cxx-qt/book/qobject/generated-qobject.html>"]
-        #[namespace = "my_namespace"]
-        #[doc = "\n\nNote: The C++ name of this QObject is: "]
-        #[doc = "MyCxxName"]
-        #[cxx_name = "MyCxxName"]
-        type MyRustName;
-    }
-    extern "Rust" {
-        type ThirdObjectRust;
-    }
-    extern "Rust" {
-        #[cxx_name = "createRs"]
-        #[namespace = "my_namespace::cxx_qt_my_rust_name"]
-        fn create_rs_third_object_rust() -> Box<ThirdObjectRust>;
-    }
-    unsafe extern "C++" {
-        #[cxx_name = "unsafeRust"]
-        #[doc(hidden)]
-        fn cxx_qt_ffi_rust(self: &MyRustName) -> &ThirdObjectRust;
-    }
-    unsafe extern "C++" {
-        #[cxx_name = "unsafeRustMut"]
-        #[doc(hidden)]
-        fn cxx_qt_ffi_rust_mut(self: Pin<&mut MyRustName>) -> Pin<&mut ThirdObjectRust>;
+        #[namespace = "rust::cxxqt1"]
+        fn cxx_qt_ffi_my_object_unsafe_rust_mut(
+            outer: Pin<&mut MyObject>,
+        ) -> Pin<&mut MyObjectRust>;
     }
     unsafe extern "C++" {
         #[doc = "The C++ type for the QObject "]
@@ -213,19 +194,23 @@ pub mod ffi {
         type SecondObject;
     }
     extern "Rust" {
+        #[namespace = "second_object"]
         type SecondObjectRust;
     }
     extern "Rust" {
-        #[cxx_name = "getPropertyNameWrapper"]
+        #[cxx_name = "getPropertyName"]
+        #[namespace = "second_object"]
         unsafe fn property_name<'a>(self: &'a SecondObject) -> &'a i32;
     }
     extern "Rust" {
-        #[cxx_name = "setPropertyNameWrapper"]
+        #[cxx_name = "setPropertyName"]
+        #[namespace = "second_object"]
         fn set_property_name(self: Pin<&mut SecondObject>, value: i32);
     }
     unsafe extern "C++" {
-        #[doc = "Notify for the Q_PROPERTY"]
         #[cxx_name = "propertyNameChanged"]
+        #[doc = "Notify for the Q_PROPERTY"]
+        #[namespace = "second_object"]
         fn property_name_changed(self: Pin<&mut SecondObject>);
     }
     unsafe extern "C++" {
@@ -257,13 +242,14 @@ pub mod ffi {
         );
     }
     extern "Rust" {
+        #[cxx_name = "invokableName"]
+        #[namespace = "second_object"]
         #[doc(hidden)]
-        #[cxx_name = "invokableNameWrapper"]
         fn invokable_name(self: Pin<&mut SecondObject>);
     }
     unsafe extern "C++" {
-        #[my_attribute]
         #[cxx_name = "ready"]
+        #[namespace = "second_object"]
         fn ready(self: Pin<&mut SecondObject>);
     }
     unsafe extern "C++" {
@@ -296,32 +282,75 @@ pub mod ffi {
         fn create_rs_second_object_rust() -> Box<SecondObjectRust>;
     }
     unsafe extern "C++" {
-        #[cxx_name = "unsafeRust"]
         #[doc(hidden)]
-        fn cxx_qt_ffi_rust(self: &SecondObject) -> &SecondObjectRust;
+        #[cxx_name = "unsafeRust"]
+        #[namespace = "rust::cxxqt1"]
+        fn cxx_qt_ffi_second_object_unsafe_rust(outer: &SecondObject) -> &SecondObjectRust;
     }
     unsafe extern "C++" {
-        #[cxx_name = "unsafeRustMut"]
         #[doc(hidden)]
-        fn cxx_qt_ffi_rust_mut(self: Pin<&mut SecondObject>) -> Pin<&mut SecondObjectRust>;
+        #[cxx_name = "unsafeRustMut"]
+        #[namespace = "rust::cxxqt1"]
+        fn cxx_qt_ffi_second_object_unsafe_rust_mut(
+            outer: Pin<&mut SecondObject>,
+        ) -> Pin<&mut SecondObjectRust>;
+    }
+    unsafe extern "C++" {
+        #[doc = "The C++ type for the QObject "]
+        #[doc = "ThirdObjectRust"]
+        #[doc = "\n"]
+        #[doc = "Use this type when referring to the QObject as a pointer"]
+        #[doc = "\n"]
+        #[doc = "See the book for more information: <https://kdab.github.io/cxx-qt/book/qobject/generated-qobject.html>"]
+        #[namespace = "my_namespace"]
+        #[doc = "\n\nNote: The C++ name of this QObject is: "]
+        #[doc = "MyCxxName"]
+        #[cxx_name = "MyCxxName"]
+        type MyRustName;
+    }
+    extern "Rust" {
+        #[namespace = "my_namespace"]
+        type ThirdObjectRust;
+    }
+    extern "Rust" {
+        #[cxx_name = "createRs"]
+        #[namespace = "my_namespace::cxx_qt_my_rust_name"]
+        fn create_rs_third_object_rust() -> Box<ThirdObjectRust>;
+    }
+    unsafe extern "C++" {
+        #[doc(hidden)]
+        #[cxx_name = "unsafeRust"]
+        #[namespace = "rust::cxxqt1"]
+        fn cxx_qt_ffi_my_cxx_name_unsafe_rust(outer: &MyRustName) -> &ThirdObjectRust;
+    }
+    unsafe extern "C++" {
+        #[doc(hidden)]
+        #[cxx_name = "unsafeRustMut"]
+        #[namespace = "rust::cxxqt1"]
+        fn cxx_qt_ffi_my_cxx_name_unsafe_rust_mut(
+            outer: Pin<&mut MyRustName>,
+        ) -> Pin<&mut ThirdObjectRust>;
     }
     #[namespace = ""]
     unsafe extern "C++" {
+        #[namespace = "cxx_qt::multi_object"]
         type QPushButton;
         #[namespace = "mynamespace"]
         #[cxx_name = "ExternObjectCpp"]
         type ExternObject;
     }
     unsafe extern "C++" {
+        #[cxx_name = "clicked"]
+        #[namespace = "cxx_qt::multi_object"]
         fn clicked(self: Pin<&mut QPushButton>, checked: bool);
     }
     unsafe extern "C++" {
         #[doc(hidden)]
-        #[namespace = "rust::cxxqtgen1"]
+        #[namespace = "cxx_qt::multi_object::rust::cxxqtgen1"]
         type QPushButtonCxxQtSignalHandlerclicked =
             cxx_qt::signalhandler::CxxQtSignalHandler<super::QPushButtonCxxQtSignalClosureclicked>;
         #[doc(hidden)]
-        #[namespace = "rust::cxxqtgen1"]
+        #[namespace = "cxx_qt::multi_object::rust::cxxqtgen1"]
         #[cxx_name = "QPushButton_clickedConnect"]
         fn QPushButton_connect_clicked(
             self_value: Pin<&mut QPushButton>,
@@ -329,7 +358,7 @@ pub mod ffi {
             conn_type: CxxQtConnectionType,
         ) -> CxxQtQMetaObjectConnection;
     }
-    #[namespace = "rust::cxxqtgen1"]
+    #[namespace = "cxx_qt::multi_object::rust::cxxqtgen1"]
     extern "Rust" {
         #[doc(hidden)]
         fn drop_QPushButton_signal_handler_clicked(handler: QPushButtonCxxQtSignalHandlerclicked);
@@ -342,6 +371,7 @@ pub mod ffi {
     }
     unsafe extern "C++" {
         #[cxx_name = "dataReady"]
+        #[namespace = "mynamespace"]
         fn data_ready(self: Pin<&mut ExternObject>);
     }
     unsafe extern "C++" {
@@ -372,8 +402,9 @@ pub mod ffi {
         );
     }
     unsafe extern "C++" {
-        #[rust_name = "error_occurred"]
-        fn errorOccurred(self: Pin<&mut ExternObject>);
+        #[cxx_name = "errorOccurred"]
+        #[namespace = "mynamespace"]
+        fn error_occurred(self: Pin<&mut ExternObject>);
     }
     unsafe extern "C++" {
         #[doc(hidden)]
@@ -404,6 +435,10 @@ pub mod ffi {
         );
     }
 }
+impl cxx_qt::Upcast<ffi::QStringListModel> for ffi::MyObject {}
+#[allow(unused_imports)]
+#[allow(dead_code)]
+use ffi::QStringListModel as _;
 impl ffi::MyObject {
     #[doc = "Getter for the Q_PROPERTY "]
     #[doc = "property_name"]
@@ -427,7 +462,9 @@ impl ffi::MyObject {
     #[doc = "Connect the given function pointer to the signal "]
     #[doc = "propertyNameChanged"]
     #[doc = ", so that when the signal is emitted the function pointer is executed."]
-    pub fn connect_property_name_changed<F: FnMut(core::pin::Pin<&mut ffi::MyObject>) + 'static>(
+    pub fn connect_property_name_changed<
+        F: FnMut(core::pin::Pin<&mut ffi::MyObject>) + 'static + Send,
+    >(
         self: core::pin::Pin<&mut ffi::MyObject>,
         mut closure: F,
         conn_type: cxx_qt::ConnectionType,
@@ -447,7 +484,9 @@ impl ffi::MyObject {
     #[doc = ", so that when the signal is emitted the function pointer is executed."]
     #[doc = "\n"]
     #[doc = "Note that this method uses a AutoConnection connection type."]
-    pub fn on_property_name_changed<F: FnMut(core::pin::Pin<&mut ffi::MyObject>) + 'static>(
+    pub fn on_property_name_changed<
+        F: FnMut(core::pin::Pin<&mut ffi::MyObject>) + 'static + Send,
+    >(
         self: core::pin::Pin<&mut ffi::MyObject>,
         mut closure: F,
     ) -> cxx_qt::QMetaObjectConnectionGuard {
@@ -468,7 +507,7 @@ impl cxx_qt::signalhandler::CxxQtSignalHandlerClosure
     type Id = cxx::type_id!(
         "::cxx_qt::multi_object::rust::cxxqtgen1::MyObjectCxxQtSignalHandlerpropertyNameChanged"
     );
-    type FnType = dyn FnMut(core::pin::Pin<&mut ffi::MyObject>);
+    type FnType = dyn FnMut(core::pin::Pin<&mut ffi::MyObject>) + Send;
 }
 use core::mem::drop as drop_MyObject_signal_handler_propertyNameChanged;
 fn call_MyObject_signal_handler_propertyNameChanged(
@@ -491,7 +530,7 @@ impl ffi::MyObject {
     #[doc = "Connect the given function pointer to the signal "]
     #[doc = "ready"]
     #[doc = ", so that when the signal is emitted the function pointer is executed."]
-    pub fn connect_ready<F: FnMut(core::pin::Pin<&mut ffi::MyObject>) + 'static>(
+    pub fn connect_ready<F: FnMut(core::pin::Pin<&mut ffi::MyObject>) + 'static + Send>(
         self: core::pin::Pin<&mut ffi::MyObject>,
         mut closure: F,
         conn_type: cxx_qt::ConnectionType,
@@ -511,7 +550,7 @@ impl ffi::MyObject {
     #[doc = ", so that when the signal is emitted the function pointer is executed."]
     #[doc = "\n"]
     #[doc = "Note that this method uses a AutoConnection connection type."]
-    pub fn on_ready<F: FnMut(core::pin::Pin<&mut ffi::MyObject>) + 'static>(
+    pub fn on_ready<F: FnMut(core::pin::Pin<&mut ffi::MyObject>) + 'static + Send>(
         self: core::pin::Pin<&mut ffi::MyObject>,
         mut closure: F,
     ) -> cxx_qt::QMetaObjectConnectionGuard {
@@ -529,7 +568,7 @@ pub struct MyObjectCxxQtSignalClosureready {}
 impl cxx_qt::signalhandler::CxxQtSignalHandlerClosure for MyObjectCxxQtSignalClosureready {
     type Id =
         cxx::type_id!("::cxx_qt::multi_object::rust::cxxqtgen1::MyObjectCxxQtSignalHandlerready");
-    type FnType = dyn FnMut(core::pin::Pin<&mut ffi::MyObject>);
+    type FnType = dyn FnMut(core::pin::Pin<&mut ffi::MyObject>) + Send;
 }
 use core::mem::drop as drop_MyObject_signal_handler_ready;
 fn call_MyObject_signal_handler_ready(
@@ -546,44 +585,23 @@ cxx_qt::static_assertions::assert_eq_size!(
     cxx_qt::signalhandler::CxxQtSignalHandler<MyObjectCxxQtSignalClosureready>,
     [usize; 2]
 );
-impl cxx_qt::Locking for ffi::MyObject {}
 #[doc(hidden)]
 pub fn create_rs_my_object_rust() -> std::boxed::Box<MyObjectRust> {
     std::boxed::Box::new(core::default::Default::default())
 }
-impl core::ops::Deref for ffi::MyObject {
+impl ::core::ops::Deref for ffi::MyObject {
     type Target = MyObjectRust;
     fn deref(&self) -> &Self::Target {
-        self.cxx_qt_ffi_rust()
+        ffi::cxx_qt_ffi_my_object_unsafe_rust(self)
     }
 }
-impl cxx_qt::CxxQtType for ffi::MyObject {
+impl ::cxx_qt::CxxQtType for ffi::MyObject {
     type Rust = MyObjectRust;
     fn rust(&self) -> &Self::Rust {
-        self.cxx_qt_ffi_rust()
+        ffi::cxx_qt_ffi_my_object_unsafe_rust(self)
     }
     fn rust_mut(self: core::pin::Pin<&mut Self>) -> core::pin::Pin<&mut Self::Rust> {
-        self.cxx_qt_ffi_rust_mut()
-    }
-}
-impl cxx_qt::Locking for ffi::MyRustName {}
-#[doc(hidden)]
-pub fn create_rs_third_object_rust() -> std::boxed::Box<ThirdObjectRust> {
-    std::boxed::Box::new(core::default::Default::default())
-}
-impl core::ops::Deref for ffi::MyRustName {
-    type Target = ThirdObjectRust;
-    fn deref(&self) -> &Self::Target {
-        self.cxx_qt_ffi_rust()
-    }
-}
-impl cxx_qt::CxxQtType for ffi::MyRustName {
-    type Rust = ThirdObjectRust;
-    fn rust(&self) -> &Self::Rust {
-        self.cxx_qt_ffi_rust()
-    }
-    fn rust_mut(self: core::pin::Pin<&mut Self>) -> core::pin::Pin<&mut Self::Rust> {
-        self.cxx_qt_ffi_rust_mut()
+        ffi::cxx_qt_ffi_my_object_unsafe_rust_mut(self)
     }
 }
 impl ffi::SecondObject {
@@ -610,7 +628,7 @@ impl ffi::SecondObject {
     #[doc = "propertyNameChanged"]
     #[doc = ", so that when the signal is emitted the function pointer is executed."]
     pub fn connect_property_name_changed<
-        F: FnMut(core::pin::Pin<&mut ffi::SecondObject>) + 'static,
+        F: FnMut(core::pin::Pin<&mut ffi::SecondObject>) + 'static + Send,
     >(
         self: core::pin::Pin<&mut ffi::SecondObject>,
         mut closure: F,
@@ -631,7 +649,9 @@ impl ffi::SecondObject {
     #[doc = ", so that when the signal is emitted the function pointer is executed."]
     #[doc = "\n"]
     #[doc = "Note that this method uses a AutoConnection connection type."]
-    pub fn on_property_name_changed<F: FnMut(core::pin::Pin<&mut ffi::SecondObject>) + 'static>(
+    pub fn on_property_name_changed<
+        F: FnMut(core::pin::Pin<&mut ffi::SecondObject>) + 'static + Send,
+    >(
         self: core::pin::Pin<&mut ffi::SecondObject>,
         mut closure: F,
     ) -> cxx_qt::QMetaObjectConnectionGuard {
@@ -652,7 +672,7 @@ impl cxx_qt::signalhandler::CxxQtSignalHandlerClosure
     type Id = cxx::type_id!(
         "::second_object::rust::cxxqtgen1::SecondObjectCxxQtSignalHandlerpropertyNameChanged"
     );
-    type FnType = dyn FnMut(core::pin::Pin<&mut ffi::SecondObject>);
+    type FnType = dyn FnMut(core::pin::Pin<&mut ffi::SecondObject>) + Send;
 }
 use core::mem::drop as drop_SecondObject_signal_handler_propertyNameChanged;
 fn call_SecondObject_signal_handler_propertyNameChanged(
@@ -675,7 +695,7 @@ impl ffi::SecondObject {
     #[doc = "Connect the given function pointer to the signal "]
     #[doc = "ready"]
     #[doc = ", so that when the signal is emitted the function pointer is executed."]
-    pub fn connect_ready<F: FnMut(core::pin::Pin<&mut ffi::SecondObject>) + 'static>(
+    pub fn connect_ready<F: FnMut(core::pin::Pin<&mut ffi::SecondObject>) + 'static + Send>(
         self: core::pin::Pin<&mut ffi::SecondObject>,
         mut closure: F,
         conn_type: cxx_qt::ConnectionType,
@@ -695,7 +715,7 @@ impl ffi::SecondObject {
     #[doc = ", so that when the signal is emitted the function pointer is executed."]
     #[doc = "\n"]
     #[doc = "Note that this method uses a AutoConnection connection type."]
-    pub fn on_ready<F: FnMut(core::pin::Pin<&mut ffi::SecondObject>) + 'static>(
+    pub fn on_ready<F: FnMut(core::pin::Pin<&mut ffi::SecondObject>) + 'static + Send>(
         self: core::pin::Pin<&mut ffi::SecondObject>,
         mut closure: F,
     ) -> cxx_qt::QMetaObjectConnectionGuard {
@@ -713,7 +733,7 @@ pub struct SecondObjectCxxQtSignalClosureready {}
 impl cxx_qt::signalhandler::CxxQtSignalHandlerClosure for SecondObjectCxxQtSignalClosureready {
     type Id =
         cxx::type_id!("::second_object::rust::cxxqtgen1::SecondObjectCxxQtSignalHandlerready");
-    type FnType = dyn FnMut(core::pin::Pin<&mut ffi::SecondObject>);
+    type FnType = dyn FnMut(core::pin::Pin<&mut ffi::SecondObject>) + Send;
 }
 use core::mem::drop as drop_SecondObject_signal_handler_ready;
 fn call_SecondObject_signal_handler_ready(
@@ -734,26 +754,47 @@ cxx_qt::static_assertions::assert_eq_size!(
 pub fn create_rs_second_object_rust() -> std::boxed::Box<SecondObjectRust> {
     std::boxed::Box::new(core::default::Default::default())
 }
-impl core::ops::Deref for ffi::SecondObject {
+impl ::core::ops::Deref for ffi::SecondObject {
     type Target = SecondObjectRust;
     fn deref(&self) -> &Self::Target {
-        self.cxx_qt_ffi_rust()
+        ffi::cxx_qt_ffi_second_object_unsafe_rust(self)
     }
 }
-impl cxx_qt::CxxQtType for ffi::SecondObject {
+impl ::cxx_qt::CxxQtType for ffi::SecondObject {
     type Rust = SecondObjectRust;
     fn rust(&self) -> &Self::Rust {
-        self.cxx_qt_ffi_rust()
+        ffi::cxx_qt_ffi_second_object_unsafe_rust(self)
     }
     fn rust_mut(self: core::pin::Pin<&mut Self>) -> core::pin::Pin<&mut Self::Rust> {
-        self.cxx_qt_ffi_rust_mut()
+        ffi::cxx_qt_ffi_second_object_unsafe_rust_mut(self)
+    }
+}
+#[doc(hidden)]
+pub fn create_rs_third_object_rust() -> std::boxed::Box<ThirdObjectRust> {
+    std::boxed::Box::new(core::default::Default::default())
+}
+impl ::core::ops::Deref for ffi::MyRustName {
+    type Target = ThirdObjectRust;
+    fn deref(&self) -> &Self::Target {
+        ffi::cxx_qt_ffi_my_cxx_name_unsafe_rust(self)
+    }
+}
+impl ::cxx_qt::CxxQtType for ffi::MyRustName {
+    type Rust = ThirdObjectRust;
+    fn rust(&self) -> &Self::Rust {
+        ffi::cxx_qt_ffi_my_cxx_name_unsafe_rust(self)
+    }
+    fn rust_mut(self: core::pin::Pin<&mut Self>) -> core::pin::Pin<&mut Self::Rust> {
+        ffi::cxx_qt_ffi_my_cxx_name_unsafe_rust_mut(self)
     }
 }
 impl ffi::QPushButton {
     #[doc = "Connect the given function pointer to the signal "]
     #[doc = "clicked"]
     #[doc = ", so that when the signal is emitted the function pointer is executed."]
-    pub fn connect_clicked<F: FnMut(core::pin::Pin<&mut ffi::QPushButton>, bool) + 'static>(
+    pub fn connect_clicked<
+        F: FnMut(core::pin::Pin<&mut ffi::QPushButton>, bool) + 'static + Send,
+    >(
         self: core::pin::Pin<&mut ffi::QPushButton>,
         mut closure: F,
         conn_type: cxx_qt::ConnectionType,
@@ -773,7 +814,7 @@ impl ffi::QPushButton {
     #[doc = ", so that when the signal is emitted the function pointer is executed."]
     #[doc = "\n"]
     #[doc = "Note that this method uses a AutoConnection connection type."]
-    pub fn on_clicked<F: FnMut(core::pin::Pin<&mut ffi::QPushButton>, bool) + 'static>(
+    pub fn on_clicked<F: FnMut(core::pin::Pin<&mut ffi::QPushButton>, bool) + 'static + Send>(
         self: core::pin::Pin<&mut ffi::QPushButton>,
         mut closure: F,
     ) -> cxx_qt::QMetaObjectConnectionGuard {
@@ -789,8 +830,10 @@ impl ffi::QPushButton {
 #[doc(hidden)]
 pub struct QPushButtonCxxQtSignalClosureclicked {}
 impl cxx_qt::signalhandler::CxxQtSignalHandlerClosure for QPushButtonCxxQtSignalClosureclicked {
-    type Id = cxx::type_id!("::rust::cxxqtgen1::QPushButtonCxxQtSignalHandlerclicked");
-    type FnType = dyn FnMut(core::pin::Pin<&mut ffi::QPushButton>, bool);
+    type Id = cxx::type_id!(
+        "::cxx_qt::multi_object::rust::cxxqtgen1::QPushButtonCxxQtSignalHandlerclicked"
+    );
+    type FnType = dyn FnMut(core::pin::Pin<&mut ffi::QPushButton>, bool) + Send;
 }
 use core::mem::drop as drop_QPushButton_signal_handler_clicked;
 fn call_QPushButton_signal_handler_clicked(
@@ -812,7 +855,7 @@ impl ffi::ExternObject {
     #[doc = "Connect the given function pointer to the signal "]
     #[doc = "dataReady"]
     #[doc = ", so that when the signal is emitted the function pointer is executed."]
-    pub fn connect_data_ready<F: FnMut(core::pin::Pin<&mut ffi::ExternObject>) + 'static>(
+    pub fn connect_data_ready<F: FnMut(core::pin::Pin<&mut ffi::ExternObject>) + 'static + Send>(
         self: core::pin::Pin<&mut ffi::ExternObject>,
         mut closure: F,
         conn_type: cxx_qt::ConnectionType,
@@ -826,7 +869,7 @@ impl ffi::ExternObject {
     #[doc = ", so that when the signal is emitted the function pointer is executed."]
     #[doc = "\n"]
     #[doc = "Note that this method uses a AutoConnection connection type."]
-    pub fn on_data_ready<F: FnMut(core::pin::Pin<&mut ffi::ExternObject>) + 'static>(
+    pub fn on_data_ready<F: FnMut(core::pin::Pin<&mut ffi::ExternObject>) + 'static + Send>(
         self: core::pin::Pin<&mut ffi::ExternObject>,
         mut closure: F,
     ) -> cxx_qt::QMetaObjectConnectionGuard {
@@ -838,7 +881,7 @@ pub struct ExternObjectCxxQtSignalClosuredataReady {}
 impl cxx_qt::signalhandler::CxxQtSignalHandlerClosure for ExternObjectCxxQtSignalClosuredataReady {
     type Id =
         cxx::type_id!("::mynamespace::rust::cxxqtgen1::ExternObjectCxxQtSignalHandlerdataReady");
-    type FnType = dyn FnMut(core::pin::Pin<&mut ffi::ExternObject>);
+    type FnType = dyn FnMut(core::pin::Pin<&mut ffi::ExternObject>) + Send;
 }
 use core::mem::drop as drop_ExternObject_signal_handler_dataReady;
 fn call_ExternObject_signal_handler_dataReady(
@@ -861,7 +904,9 @@ impl ffi::ExternObject {
     #[doc = "Connect the given function pointer to the signal "]
     #[doc = "errorOccurred"]
     #[doc = ", so that when the signal is emitted the function pointer is executed."]
-    pub fn connect_error_occurred<F: FnMut(core::pin::Pin<&mut ffi::ExternObject>) + 'static>(
+    pub fn connect_error_occurred<
+        F: FnMut(core::pin::Pin<&mut ffi::ExternObject>) + 'static + Send,
+    >(
         self: core::pin::Pin<&mut ffi::ExternObject>,
         mut closure: F,
         conn_type: cxx_qt::ConnectionType,
@@ -883,7 +928,7 @@ impl ffi::ExternObject {
     #[doc = ", so that when the signal is emitted the function pointer is executed."]
     #[doc = "\n"]
     #[doc = "Note that this method uses a AutoConnection connection type."]
-    pub fn on_error_occurred<F: FnMut(core::pin::Pin<&mut ffi::ExternObject>) + 'static>(
+    pub fn on_error_occurred<F: FnMut(core::pin::Pin<&mut ffi::ExternObject>) + 'static + Send>(
         self: core::pin::Pin<&mut ffi::ExternObject>,
         mut closure: F,
     ) -> cxx_qt::QMetaObjectConnectionGuard {
@@ -906,7 +951,7 @@ impl cxx_qt::signalhandler::CxxQtSignalHandlerClosure
     type Id = cxx::type_id!(
         "::mynamespace::rust::cxxqtgen1::ExternObjectCxxQtSignalHandlererrorOccurred"
     );
-    type FnType = dyn FnMut(core::pin::Pin<&mut ffi::ExternObject>);
+    type FnType = dyn FnMut(core::pin::Pin<&mut ffi::ExternObject>) + Send;
 }
 use core::mem::drop as drop_ExternObject_signal_handler_errorOccurred;
 fn call_ExternObject_signal_handler_errorOccurred(

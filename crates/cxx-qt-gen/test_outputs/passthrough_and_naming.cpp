@@ -1,11 +1,11 @@
-#include "cxx-qt-gen/multi_object.cxxqt.h"
+#include "directory/file_ident.cxxqt.h"
 
 // Define namespace otherwise we hit a GCC bug
 // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=56480
 namespace rust::cxxqt1 {
 template<>
-SignalHandler<::rust::cxxqtgen1::QPushButtonCxxQtSignalParamsclicked*>::
-  ~SignalHandler() noexcept
+SignalHandler<::cxx_qt::multi_object::rust::cxxqtgen1::
+                QPushButtonCxxQtSignalParamsclicked*>::~SignalHandler() noexcept
 {
   if (data[0] == nullptr && data[1] == nullptr) {
     return;
@@ -17,43 +17,44 @@ SignalHandler<::rust::cxxqtgen1::QPushButtonCxxQtSignalParamsclicked*>::
 template<>
 template<>
 void
-SignalHandler<::rust::cxxqtgen1::QPushButtonCxxQtSignalParamsclicked*>::
-operator()<QPushButton&, bool>(QPushButton& self, bool checked)
+SignalHandler<::cxx_qt::multi_object::rust::cxxqtgen1::
+                QPushButtonCxxQtSignalParamsclicked*>::
+operator()<cxx_qt::multi_object::QPushButton&, bool>(
+  cxx_qt::multi_object::QPushButton& self,
+  bool checked)
 {
   call_QPushButton_signal_handler_clicked(*this, self, ::std::move(checked));
 }
 
-static_assert(
-  alignof(
-    SignalHandler<::rust::cxxqtgen1::QPushButtonCxxQtSignalParamsclicked*>) <=
-    alignof(::std::size_t),
-  "unexpected aligment");
-static_assert(
-  sizeof(
-    SignalHandler<::rust::cxxqtgen1::QPushButtonCxxQtSignalParamsclicked*>) ==
-    sizeof(::std::size_t[2]),
-  "unexpected size");
+static_assert(alignof(SignalHandler<::cxx_qt::multi_object::rust::cxxqtgen1::
+                                      QPushButtonCxxQtSignalParamsclicked*>) <=
+                alignof(::std::size_t),
+              "unexpected aligment");
+static_assert(sizeof(SignalHandler<::cxx_qt::multi_object::rust::cxxqtgen1::
+                                     QPushButtonCxxQtSignalParamsclicked*>) ==
+                sizeof(::std::size_t[2]),
+              "unexpected size");
 } // namespace rust::cxxqt1
 
-namespace rust::cxxqtgen1 {
+namespace cxx_qt::multi_object::rust::cxxqtgen1 {
 ::QMetaObject::Connection
 QPushButton_clickedConnect(
-  QPushButton& self,
-  ::rust::cxxqtgen1::QPushButtonCxxQtSignalHandlerclicked closure,
+  cxx_qt::multi_object::QPushButton& self,
+  ::cxx_qt::multi_object::rust::cxxqtgen1::QPushButtonCxxQtSignalHandlerclicked
+    closure,
   ::Qt::ConnectionType type)
 {
   return ::QObject::connect(
     &self,
-    &QPushButton::clicked,
+    &cxx_qt::multi_object::QPushButton::clicked,
     &self,
     [&, closure = ::std::move(closure)](bool checked) mutable {
-      const ::rust::cxxqt1::MaybeLockGuard<QPushButton> guard(self);
-      closure.template operator()<QPushButton&, bool>(self,
-                                                      ::std::move(checked));
+      closure.template operator()<cxx_qt::multi_object::QPushButton&, bool>(
+        self, ::std::move(checked));
     },
     type);
 }
-} // namespace rust::cxxqtgen1
+} // namespace cxx_qt::multi_object::rust::cxxqtgen1
 
 // Define namespace otherwise we hit a GCC bug
 // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=56480
@@ -105,8 +106,6 @@ ExternObjectCpp_dataReadyConnect(
     &mynamespace::ExternObjectCpp::dataReady,
     &self,
     [&, closure = ::std::move(closure)]() mutable {
-      const ::rust::cxxqt1::MaybeLockGuard<mynamespace::ExternObjectCpp> guard(
-        self);
       closure.template operator()<mynamespace::ExternObjectCpp&>(self);
     },
     type);
@@ -163,8 +162,6 @@ ExternObjectCpp_errorOccurredConnect(
     &mynamespace::ExternObjectCpp::errorOccurred,
     &self,
     [&, closure = ::std::move(closure)]() mutable {
-      const ::rust::cxxqt1::MaybeLockGuard<mynamespace::ExternObjectCpp> guard(
-        self);
       closure.template operator()<mynamespace::ExternObjectCpp&>(self);
     },
     type);
@@ -222,8 +219,6 @@ MyObject_propertyNameChangedConnect(
     &cxx_qt::multi_object::MyObject::propertyNameChanged,
     &self,
     [&, closure = ::std::move(closure)]() mutable {
-      const ::rust::cxxqt1::MaybeLockGuard<cxx_qt::multi_object::MyObject>
-        guard(self);
       closure.template operator()<cxx_qt::multi_object::MyObject&>(self);
     },
     type);
@@ -278,8 +273,6 @@ MyObject_readyConnect(
     &cxx_qt::multi_object::MyObject::ready,
     &self,
     [&, closure = ::std::move(closure)]() mutable {
-      const ::rust::cxxqt1::MaybeLockGuard<cxx_qt::multi_object::MyObject>
-        guard(self);
       closure.template operator()<cxx_qt::multi_object::MyObject&>(self);
     },
     type);
@@ -287,47 +280,14 @@ MyObject_readyConnect(
 } // namespace cxx_qt::multi_object::rust::cxxqtgen1
 
 namespace cxx_qt::multi_object {
-::std::int32_t const&
-MyObject::getPropertyName() const
-{
-  const ::rust::cxxqt1::MaybeLockGuard<MyObject> guard(*this);
-  return getPropertyNameWrapper();
-}
-
-void
-MyObject::setPropertyName(::std::int32_t const& value)
-{
-  const ::rust::cxxqt1::MaybeLockGuard<MyObject> guard(*this);
-  setPropertyNameWrapper(value);
-}
-
-void
-MyObject::invokableName()
-{
-  const ::rust::cxxqt1::MaybeLockGuard<MyObject> guard(*this);
-  invokableNameWrapper();
-}
-
 MyObject::MyObject(QObject* parent)
   : QStringListModel(parent)
   , ::rust::cxxqt1::CxxQtType<MyObjectRust>(
       ::cxx_qt::multi_object::cxx_qt_my_object::createRs())
-  , ::rust::cxxqt1::CxxQtLocking()
 {
 }
 
 } // namespace cxx_qt::multi_object
-
-namespace my_namespace {
-MyCxxName::MyCxxName(QObject* parent)
-  : QObject(parent)
-  , ::rust::cxxqt1::CxxQtType<ThirdObjectRust>(
-      ::my_namespace::cxx_qt_my_rust_name::createRs())
-  , ::rust::cxxqt1::CxxQtLocking()
-{
-}
-
-} // namespace my_namespace
 
 // Define namespace otherwise we hit a GCC bug
 // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=56480
@@ -379,8 +339,6 @@ SecondObject_propertyNameChangedConnect(
     &second_object::SecondObject::propertyNameChanged,
     &self,
     [&, closure = ::std::move(closure)]() mutable {
-      const ::rust::cxxqt1::MaybeLockGuard<second_object::SecondObject> guard(
-        self);
       closure.template operator()<second_object::SecondObject&>(self);
     },
     type);
@@ -437,8 +395,6 @@ SecondObject_readyConnect(
     &second_object::SecondObject::ready,
     &self,
     [&, closure = ::std::move(closure)]() mutable {
-      const ::rust::cxxqt1::MaybeLockGuard<second_object::SecondObject> guard(
-        self);
       closure.template operator()<second_object::SecondObject&>(self);
     },
     type);
@@ -446,27 +402,6 @@ SecondObject_readyConnect(
 } // namespace second_object::rust::cxxqtgen1
 
 namespace second_object {
-::std::int32_t const&
-SecondObject::getPropertyName() const
-{
-  const ::rust::cxxqt1::MaybeLockGuard<SecondObject> guard(*this);
-  return getPropertyNameWrapper();
-}
-
-void
-SecondObject::setPropertyName(::std::int32_t const& value)
-{
-  const ::rust::cxxqt1::MaybeLockGuard<SecondObject> guard(*this);
-  setPropertyNameWrapper(value);
-}
-
-void
-SecondObject::invokableName()
-{
-  const ::rust::cxxqt1::MaybeLockGuard<SecondObject> guard(*this);
-  invokableNameWrapper();
-}
-
 SecondObject::SecondObject(QObject* parent)
   : QObject(parent)
   , ::rust::cxxqt1::CxxQtType<SecondObjectRust>(
@@ -475,3 +410,13 @@ SecondObject::SecondObject(QObject* parent)
 }
 
 } // namespace second_object
+
+namespace my_namespace {
+MyCxxName::MyCxxName(QObject* parent)
+  : QObject(parent)
+  , ::rust::cxxqt1::CxxQtType<ThirdObjectRust>(
+      ::my_namespace::cxx_qt_my_rust_name::createRs())
+{
+}
+
+} // namespace my_namespace

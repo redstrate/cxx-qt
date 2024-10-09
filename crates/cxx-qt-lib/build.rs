@@ -49,6 +49,12 @@ fn write_headers() {
     println!("cargo::rerun-if-changed=include/common.h");
     std::fs::copy("include/common.h", header_dir().join("common.h"))
         .expect("Failed to copy header file!");
+    println!("cargo::rerun-if-changed=include/assertion_utils.h");
+    std::fs::copy(
+        "include/assertion_utils.h",
+        header_dir().join("assertion_utils.h"),
+    )
+    .expect("Failed to copy header file!");
 
     write_headers_in("core");
     if qt_gui_enabled() {
@@ -63,6 +69,9 @@ fn write_headers() {
 }
 
 fn main() {
+    let qtbuild = qt_build_utils::QtBuild::new(vec!["Core".to_owned()])
+        .expect("Could not find Qt installation");
+
     write_headers();
 
     let emscripten_targeted = match std::env::var("CARGO_CFG_TARGET_OS") {
@@ -87,6 +96,8 @@ fn main() {
         "core/qlist/qlist_i64",
         "core/qlist/qlist_qbytearray",
         "core/qlist/qlist_qdate",
+        "core/qlist/qlist_qline",
+        "core/qlist/qlist_qlinef",
         "core/qlist/qlist_qmargins",
         "core/qlist/qlist_qmarginsf",
         "core/qlist/qlist_qpersistentmodelindex",
@@ -172,6 +183,8 @@ fn main() {
         "core/qvector/qvector_i64",
         "core/qvector/qvector_qbytearray",
         "core/qvector/qvector_qdate",
+        "core/qvector/qvector_qline",
+        "core/qvector/qvector_qlinef",
         "core/qvector/qvector_qmargins",
         "core/qvector/qvector_qmarginsf",
         "core/qvector/qvector_qpersistentmodelindex",
@@ -190,6 +203,10 @@ fn main() {
         "core/qvector/qvector_u32",
         "core/qvector/qvector_u64",
     ];
+
+    if qtbuild.version().major > 5 {
+        rust_bridges.extend(["core/qanystringview"]);
+    }
 
     if qt_gui_enabled() {
         rust_bridges.extend([
@@ -258,6 +275,10 @@ fn main() {
         "core/qvariant/qvariant",
         "core/qvector/qvector",
     ];
+
+    if qtbuild.version().major > 5 {
+        cpp_files.extend(["core/qanystringview"]);
+    }
 
     if qt_gui_enabled() {
         cpp_files.extend([
@@ -334,7 +355,6 @@ fn main() {
         cc.file("src/qt_types.cpp");
         println!("cargo:rerun-if-changed=src/qt_types.cpp");
     });
-    println!("cargo:rerun-if-changed=src/assertion_utils.h");
 
     builder.build();
 }

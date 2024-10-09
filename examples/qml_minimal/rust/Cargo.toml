@@ -5,8 +5,10 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 # ANCHOR: book_all
 # ANCHOR: book_static_lib
+# ANCHOR: book_package_name
 [package]
 name = "qml_minimal"
+# ANCHOR_END: book_package_name
 version = "0.1.0"
 authors = [
   "Andrew Hayzen <andrew.hayzen@kdab.com>",
@@ -29,7 +31,7 @@ cxx.workspace = true
 # Use `cxx-qt = "0.6"` here instead!
 cxx-qt.workspace = true
 # Use `cxx-qt-lib = "0.6"` here instead!
-cxx-qt-lib.workspace = true
+cxx-qt-lib = { workspace = true, features = ["qt_full"] }
 # ANCHOR_END: book_dependencies
 
 # cxx-qt-build generates C++ code from the `#[cxx_qt::bridge]` module

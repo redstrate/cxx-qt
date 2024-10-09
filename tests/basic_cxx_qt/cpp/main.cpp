@@ -10,28 +10,11 @@
 #include <QtTest/QSignalSpy>
 #include <QtTest/QTest>
 
-#include "basic_cxx_qt/empty.cxxqt.h"
-#include "basic_cxx_qt/locking.cxxqt.h"
-#include "basic_cxx_qt/my_data.cxxqt.h"
-#include "basic_cxx_qt/my_object.cxxqt.h"
-#include "basic_cxx_qt/my_types.cxxqt.h"
-
-class LockingWorkerThread : public QThread
-{
-  Q_OBJECT
-
-public:
-  LockingWorkerThread(std::function<void()> lambda, QObject* parent = nullptr)
-    : QThread(parent)
-    , m_lambda(lambda)
-  {
-  }
-
-  void run() override { m_lambda(); }
-
-private:
-  std::function<void()> m_lambda;
-};
+#include "basic_cxx_qt/src/data.cxxqt.h"
+#include "basic_cxx_qt/src/empty.cxxqt.h"
+#include "basic_cxx_qt/src/lib.cxxqt.h"
+#include "basic_cxx_qt/src/naming.cxxqt.h"
+#include "basic_cxx_qt/src/types.cxxqt.h"
 
 class CxxQtTest : public QObject
 {
@@ -42,9 +25,15 @@ private Q_SLOTS:
   void test_basic_interaction()
   {
     cxx_qt::my_object::MyObject obj;
+    object_namespace::RenamedObject obj2;
+    bridge_namespace::NamedObject obj3;
 
     obj.sayHi(QStringLiteral("Hello World!"), 32);
 
+    const auto value1 = obj2.getDouble();
+    QCOMPARE(value1, 50);
+
+    obj3.sayHi(QStringLiteral("Hello World!"), 32);
     // Check that an invokable can be called and the return value is correct
     const auto value = obj.doubleNumber(32);
     qInfo() << "Double of 32 is:" << value;
@@ -107,54 +96,6 @@ private Q_SLOTS:
     // Check that initial value of the deserialised data
     QCOMPARE(data.asJsonStr(),
              QStringLiteral("{\"number\":16,\"string\":\"Hello\"}"));
-  }
-
-  // Ensure that locking can be disabled
-  void test_locking_disabled()
-  {
-    RustLockingDisabled lockingDisabled;
-    QCOMPARE(lockingDisabled.getCounter(), 0);
-
-    QVector<LockingWorkerThread*> threads;
-    for (int i = 0; i < 10; i++) {
-      threads.push_back(new LockingWorkerThread(
-        [&lockingDisabled]() { lockingDisabled.increment(); }, this));
-    }
-
-    for (auto& thread : threads) {
-      thread->start();
-    }
-
-    for (auto& thread : threads) {
-      thread->wait();
-    }
-
-    // We should expect some increments but not all
-    QVERIFY(lockingDisabled.getCounter() > 0);
-    QVERIFY(lockingDisabled.getCounter() < 10);
-  }
-
-  // Ensure that locking works when enabled
-  void test_locking_enabled()
-  {
-    RustLockingEnabled lockingEnabled;
-    QCOMPARE(lockingEnabled.getCounter(), 0);
-
-    QVector<LockingWorkerThread*> threads;
-    for (int i = 0; i < 10; i++) {
-      threads.push_back(new LockingWorkerThread(
-        [&lockingEnabled]() { lockingEnabled.increment(); }, this));
-    }
-
-    for (auto& thread : threads) {
-      thread->start();
-    }
-
-    for (auto& thread : threads) {
-      thread->wait();
-    }
-
-    QCOMPARE(lockingEnabled.getCounter(), 10);
   }
 
   // CXX-Qt allows Rust code to queue a request

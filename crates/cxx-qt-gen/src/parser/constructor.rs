@@ -20,6 +20,7 @@ struct ConstructorArguments {
 }
 
 /// A parsed cxx_qt::Constructor trait impl.
+#[derive(Debug, PartialEq, Eq)]
 pub struct Constructor {
     /// The arguments to the constructor defined by this trait impl.
     pub arguments: Vec<Type>,
@@ -37,6 +38,7 @@ pub struct Constructor {
     pub lifetime: Option<Lifetime>,
 
     /// The original impl that this constructor was parse from.
+    // TODO: This has moved into MarkerTrait
     pub imp: ItemImpl,
 }
 
@@ -95,7 +97,7 @@ impl Constructor {
 
             Err(Error::new(
                 span,
-                "cxx_qt::Constructor expects a tuple as the first generic argument",
+                "cxx_qt::Constructor expects a tuple as the first generic argument!",
             ))
         }
     }
@@ -146,23 +148,23 @@ impl Constructor {
         if let Some(unsafety) = imp.unsafety {
             return Err(Error::new_spanned(
                 unsafety,
-                "Unnecessary unsafe around constructor impl.",
+                "Unnecessary unsafe around constructor impl!",
             ));
         }
 
-        if !imp.items.is_empty() {
+        let (not, trait_path, _) = &imp
+            .trait_
+            .as_ref()
+            .ok_or_else(|| Error::new_spanned(imp.clone(), "Expected a trait impl!"))?;
+
+        if not.is_some() {
             return Err(Error::new_spanned(
-                imp.items.first(),
-                "cxx_qt::Constructor must only be declared, not implemented inside cxx_qt::bridge!",
+                trait_path,
+                "Negative impls for cxx_qt::Constructor are not allowed!",
             ));
         }
 
         let lifetime = Self::parse_impl_generics(&imp.generics)?;
-
-        let (_, trait_path, _) = &imp
-            .trait_
-            .as_ref()
-            .ok_or_else(|| Error::new_spanned(imp.clone(), "Expected trait impl!"))?;
 
         let (argument_list, arguments) = Self::parse_arguments(trait_path)?;
         Ok(Constructor {
@@ -178,75 +180,64 @@ impl Constructor {
 
 #[cfg(test)]
 mod tests {
-    use syn::parse_quote;
-
     use super::*;
-
-    fn assert_parse_error(item: ItemImpl, message: &str) {
-        assert!(
-            Constructor::parse(item).is_err(),
-            "Constructor shouldn't have parsed because '{message}'."
-        );
-    }
+    use crate::tests::assert_parse_errors;
+    use syn::parse_quote;
 
     #[test]
     fn parse_invalid_constructors() {
-        assert_parse_error(
-            parse_quote! {
+        assert_parse_errors! {
+            Constructor::parse =>
+
+            {
+                /// Missing type arguments
                 impl cxx_qt::Constructor for X {}
-            },
-            "missing type arguments",
-        );
-        assert_parse_error(
-            parse_quote! {
+            }
+            {
+                /// Missing main argument list
                 impl cxx_qt::Constructor<NewArguments=()> for X {}
-            },
-            "missing main argument list",
-        );
-
-        assert_parse_error(
-            parse_quote! {
-                impl cxx_qt::Constructor<()> for X {
-                    fn some_impl() {}
-                }
-            },
-            "item in impl block",
-        );
-
-        assert_parse_error(
-            parse_quote! {
+            }
+            {
+                /// Negative impls for cxx_qt::Constructor are not allowed
+                impl !cxx_qt::Constructor<(i32, i32)> for T {}
+            }
+            {
+                /// Generics on impl block are not allowed
                 impl<T> cxx_qt::Constructor<()> for T {}
-            },
-            "generics on impl block",
-        );
-        // TODO This should be allowed at some point if the lifetime is actually used.
-        assert_parse_error(
-            parse_quote! {
+            }
+            {
+                /// Multiple Lifetimes are not allowed
                 impl<'a, 'b> cxx_qt::Constructor<()> for T {}
-            },
-            "multiple lifetimes on impl block",
-        );
-
-        assert_parse_error(
-            parse_quote! {
+            }
+            {
+                /// Unknown named args
                 impl cxx_qt::Constructor<(), UnknownArguments=()> for X {}
-            },
-            "unknown named type argument",
-        );
-        assert_parse_error(
-            parse_quote! {
+            }
+            {
+                /// Duplicate args
                 impl cxx_qt::Constructor<(), NewArguments=(), NewArguments=()> for X {}
-            },
-            "duplicate named type argument",
-        );
-
-        // Not a tuple, missing `,`
-        assert_parse_error(
-            parse_quote! {
+            }
+            {
+                /// Expects a tuple
+                impl cxx_qt::Constructor<> for X {}
+            }
+            {
+                /// Not a tuple
                 impl cxx_qt::Constructor<(i32)> for X {}
-            },
-            "type argument is not a tuple",
-        );
+            }
+            {
+                /// Expected 2nd generic arg to be an associated type
+                impl cxx_qt::Constructor<(i32,String),'a> for X {}
+            }
+            {
+                /// Where clauses are not allowed
+                impl cxx_qt::Constructor<(T,S)> for X where S: Debug, T: Clone {}
+            }
+            {
+                /// Unnecessary unsafe impl
+                unsafe impl cxx_qt::Constructor<(i32,String)> for X {}
+            }
+        }
     }
 
     #[test]

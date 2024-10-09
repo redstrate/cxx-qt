@@ -7,13 +7,14 @@
 
 #include "cxx-qt-lib/qfont.h"
 
-#include "../assertion_utils.h"
+#include <cxx-qt-lib/assertion_utils.h>
 
 // https://code.qt.io/cgit/qt/qtbase.git/tree/src/gui/text/qfont.h?h=v5.15.6-lts-lgpl#n344
 // https://code.qt.io/cgit/qt/qtbase.git/tree/src/gui/text/qfont.h?h=v6.2.4#n323
-assert_alignment_and_size(QFont,
-                          alignof(::std::size_t),
-                          sizeof(::std::size_t) + sizeof(::std::int64_t));
+assert_alignment_and_size(QFont, {
+  ::std::size_t a0;
+  ::std::uint32_t a1;
+}); // uint can be 16 or 32 but should align to at least 32
 
 static_assert(!::std::is_trivially_copy_assignable<QFont>::value);
 static_assert(!::std::is_trivially_copy_constructible<QFont>::value);

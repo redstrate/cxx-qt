@@ -16,6 +16,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
   - [Building with CMake](./getting-started/5-cmake-integration.md)
 - [Core Concepts](./concepts/index.md)
   - [Build Systems](./concepts/build_systems.md)
+    - [Building for WebAssembly](./concepts/wasm-builds.md)
   - [Generated `QObject`](./concepts/generated_qobject.md)
   - [Types](./concepts/types.md)
   - [Nested Objects](./concepts/nested_objects.md)
@@ -26,3 +27,5 @@ SPDX-License-Identifier: MIT OR Apache-2.0
   - [Shared types](./bridge/shared_types.md)
   - [Attributes](./bridge/attributes.md)
   - [Traits](./bridge/traits.md)
+- [For Contributors: CXX-Qt Internals](./internals/index.md)
+  - [Build System](./internals/build-system.md)

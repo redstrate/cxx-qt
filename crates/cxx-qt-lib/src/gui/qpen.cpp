@@ -7,11 +7,11 @@
 
 #include "cxx-qt-lib/qpen.h"
 
-#include "../assertion_utils.h"
+#include <cxx-qt-lib/assertion_utils.h>
 
 // https://code.qt.io/cgit/qt/qtbase.git/tree/src/gui/painting/qpen.h?h=v5.15.6-lts-lgpl#n124
 // https://code.qt.io/cgit/qt/qtbase.git/tree/src/gui/painting/qpen.h?h=v6.2.4#n94
-assert_alignment_and_size(QPen, alignof(::std::size_t), sizeof(::std::size_t));
+assert_alignment_and_size(QPen, { ::std::size_t a0; });
 
 static_assert(!::std::is_trivially_copy_assignable<QPen>::value);
 static_assert(!::std::is_trivially_copy_constructible<QPen>::value);

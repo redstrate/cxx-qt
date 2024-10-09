@@ -4,10 +4,17 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 use crate::naming::TypeNames;
+use crate::syntax::lifetimes::err_unsupported_type;
+use quote::ToTokens;
 use syn::{
-    spanned::Spanned, Error, Expr, GenericArgument, Lit, PathArguments, PathSegment, Result,
-    ReturnType, Type, TypeArray, TypeBareFn, TypePtr, TypeReference, TypeSlice,
+    spanned::Spanned, Attribute, Error, Expr, ExprLit, GenericArgument, Lit, PathArguments,
+    PathSegment, Result, ReturnType, Type, TypeArray, TypeBareFn, TypePtr, TypeReference,
+    TypeSlice,
 };
+
+pub(crate) fn err_unsupported_item(item: &impl ToTokens) -> Error {
+    Error::new_spanned(item, "Unsupported Item!")
+}
 
 /// For a given Rust return type determine if the C++ header should have noexcept
 pub(crate) fn syn_return_type_to_cpp_except(return_ty: &ReturnType) -> &str {
@@ -18,6 +25,10 @@ pub(crate) fn syn_return_type_to_cpp_except(return_ty: &ReturnType) -> &str {
                 if segment.ident == "Result" {
                     return "";
                 }
+            } else {
+                // CODECOV_EXCLUDE_START
+                unreachable!("Path cannot be empty!")
+                // CODECOV_EXCLUDE_STOP
             }
         }
     }
@@ -42,7 +53,7 @@ pub(crate) fn syn_type_to_cpp_return_type(
                     if args.len() != 1 {
                         return Err(Error::new(
                             return_ty.span(),
-                            "Result must have one argument",
+                            "Result must have one argument!",
                         ));
                     }
 
@@ -54,9 +65,15 @@ pub(crate) fn syn_type_to_cpp_return_type(
 
                         return Ok(Some(arg));
                     } else {
+                        // CODECOV_EXCLUDE_START
                         unreachable!("Args should be of length 1");
+                        // CODECOV_EXCLUDE_STOP
                     }
                 }
+            } else {
+                // CODECOV_EXCLUDE_START
+                unreachable!("Path cannot be empty!")
+                // CODECOV_EXCLUDE_STOP
             }
         }
 
@@ -73,18 +90,19 @@ pub(crate) fn syn_type_to_cpp_return_type(
 pub(crate) fn syn_type_to_cpp_type(ty: &Type, type_names: &TypeNames) -> Result<String> {
     match ty {
         Type::Array(TypeArray { elem, len, .. }) => {
-            let len = if let Expr::Lit(len) = &len {
-                if let Lit::Int(len) = &len.lit {
-                    len.base10_parse::<usize>()?
-                } else {
-                    return Err(Error::new(ty.span(), "Array length must be a integer"));
-                }
+            let _empty: Vec<Attribute> = vec![];
+
+            let len = if let Expr::Lit(ExprLit {
+                lit: Lit::Int(len), ..
+            }) = &len
+            {
+                len.base10_parse::<usize>()?
             } else {
-                return Err(Error::new(ty.span(), "Array length must be a integer"));
+                return Err(Error::new(ty.span(), "Array length must be an integer!"));
             };
 
             if len == 0 {
-                return Err(Error::new(ty.span(), "Array length must be > 0"));
+                return Err(Error::new(ty.span(), "Array length must be > 0!"));
             }
 
             Ok(format!(
@@ -122,7 +140,10 @@ pub(crate) fn syn_type_to_cpp_type(ty: &Type, type_names: &TypeNames) -> Result<
                 let first = ty_strings.first().unwrap();
                 Ok(first.to_owned())
             } else {
-                Ok(ty_strings.join("::"))
+                Err(Error::new(
+                    ty.span(),
+                    "Paths with multiple segments are not supported in types!",
+                ))
             }
         }
         Type::Ptr(TypePtr {
@@ -157,10 +178,7 @@ pub(crate) fn syn_type_to_cpp_type(ty: &Type, type_names: &TypeNames) -> Result<
             }
         }
         Type::Tuple(tuple) if tuple.elems.is_empty() => Ok("void".to_string()),
-        _others => Err(Error::new(
-            ty.span(),
-            format!("Unsupported type: {_others:?}"),
-        )),
+        _others => Err(err_unsupported_type(ty)),
     }
 }
 
@@ -168,9 +186,9 @@ pub(crate) fn syn_type_to_cpp_type(ty: &Type, type_names: &TypeNames) -> Result<
 fn generic_argument_to_string(generic: &GenericArgument, type_names: &TypeNames) -> Result<String> {
     match generic {
         GenericArgument::Type(ty) => syn_type_to_cpp_type(ty, type_names),
-        _others => Err(Error::new(
+        _other => Err(Error::new(
             generic.span(),
-            "Unsupported GenericArgument type",
+            "Unsupported GenericArgument type!",
         )),
     }
 }
@@ -188,10 +206,11 @@ fn path_argument_to_string(
                 .map(|generic| generic_argument_to_string(generic, type_names))
                 .collect::<Result<Vec<String>>>()?,
         )),
-        PathArguments::Parenthesized(_) => Err(Error::new(
-            args.span(),
-            "Parenthesized arguments are unsupported",
-        )),
+        PathArguments::Parenthesized(_) => {
+            // CODECOV_EXCLUDE_START
+            unreachable!("Parenthesized path args are not supported!")
+            // CODECOV_EXCLUDE_STOP
+        }
         PathArguments::None => Ok(None),
     }
 }
@@ -208,15 +227,12 @@ fn path_segment_to_string(segment: &PathSegment, type_names: &TypeNames) -> Resu
                 path_argument_to_string(&segment.arguments, type_names)?.unwrap_or_else(Vec::new);
 
             if args.len() != 1 {
-                return Err(Error::new(segment.span(), "Pin must have one argument"));
+                return Err(Error::new(segment.span(), "Pin must have one argument!"));
             }
             return Ok(args.pop().unwrap());
         }
-        "Result" => {
-            return Err(Error::new(segment.span(), "Result is not supported"));
-        }
-        "Option" => {
-            return Err(Error::new(segment.span(), "Option is not supported"));
+        "Result" | "Option" => {
+            return Err(err_unsupported_item(ident));
         }
         _others => {
             path_argument_to_string(&segment.arguments, type_names)?.map(|values| values.join(", "))
@@ -229,10 +245,7 @@ fn path_segment_to_string(segment: &PathSegment, type_names: &TypeNames) -> Resu
         if let Some(ident) = possible_built_in_template_base(&ident_string) {
             Ok(format!("{ident}<{arg}>"))
         } else {
-            Err(Error::new_spanned(
-                ident,
-                format!("Unsupported template base: {ident}"),
-            ))
+            Err(err_unsupported_type(ident))
         }
     } else {
         type_names.cxx_qualified(&segment.ident)
@@ -257,9 +270,9 @@ fn possible_built_in_template_base(ty: &str) -> Option<&str> {
 
 #[cfg(test)]
 mod tests {
-    use syn::parse_quote;
-
     use super::*;
+    use crate::tests::assert_parse_errors;
+    use syn::parse_quote;
 
     #[test]
     fn test_syn_return_type_to_cpp_except_default() {
@@ -276,6 +289,12 @@ mod tests {
     #[test]
     fn test_syn_return_type_to_cpp_except_type() {
         let ty = parse_quote! { -> T };
+        assert_eq!(syn_return_type_to_cpp_except(&ty), "noexcept");
+    }
+
+    #[test]
+    fn test_syn_return_type_to_cpp_except_type_ptr() {
+        let ty = parse_quote! { -> *mut T };
         assert_eq!(syn_return_type_to_cpp_except(&ty), "noexcept");
     }
 
@@ -328,8 +347,34 @@ mod tests {
             { &*mut T } => "T* const&",
             { &mut QPoint } => "QPoint&",
             { &QPoint } => "QPoint const&",
-            { QPoint} => "QPoint"
+            { QPoint } => "QPoint",
+            { SharedPtr<T> } => "::std::shared_ptr<T>",
+            { WeakPtr<T> } => "::std::weak_ptr<T>",
+            { CxxVector<T> } => "::std::vector<T>"
         ];
+    }
+
+    #[test]
+    fn test_invalid_types() {
+        let mut type_names = TypeNames::default();
+        assert_parse_errors! {
+            |ty| {
+                type_names.mock_insert("A", None, Some("A1"), None);
+                syn_type_to_cpp_type(&ty, &type_names)
+            } =>
+
+            { (A) }
+            { Option<A> }
+            { Result<A> }
+            { Pin<> }
+            { Vec<'a, T> }
+            { f32::f32::f32 }
+            { NotATemplate<A> }
+            { [i32; 0] }
+            { [i32; String] }
+            { [i32; 1.5f32] }
+            { (i32, ) }
+        }
     }
 
     #[test]
@@ -349,24 +394,6 @@ mod tests {
     }
 
     #[test]
-    fn test_syn_type_to_cpp_type_array_length_zero() {
-        let ty = parse_quote! { [i32; 0] };
-        assert!(syn_type_to_cpp_type(&ty, &TypeNames::default()).is_err());
-    }
-
-    #[test]
-    fn test_syn_type_to_cpp_type_array_length_invalid() {
-        let ty = parse_quote! { [i32; String] };
-        assert!(syn_type_to_cpp_type(&ty, &TypeNames::default()).is_err());
-    }
-
-    #[test]
-    fn test_syn_type_to_cpp_type_tuple_multiple() {
-        let ty = parse_quote! { (i32, ) };
-        assert!(syn_type_to_cpp_type(&ty, &TypeNames::default()).is_err());
-    }
-
-    #[test]
     fn test_syn_type_to_cpp_return_type_none() {
         let ty = parse_quote! {};
         assert_eq!(
@@ -381,6 +408,15 @@ mod tests {
         assert_eq!(
             syn_type_to_cpp_return_type(&ty, &TypeNames::default()).unwrap(),
             Some("bool".to_string())
+        );
+    }
+
+    #[test]
+    fn test_syn_type_to_cpp_return_type_array() {
+        let ty = parse_quote! { -> [i32; 5] };
+        assert_eq!(
+            syn_type_to_cpp_return_type(&ty, &TypeNames::default()).unwrap(),
+            Some("::std::array<::std::int32_t, 5>".to_string())
         );
     }
 

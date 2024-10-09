@@ -24,7 +24,7 @@ pub fn generate(qobject_idents: &QObjectNames) -> Result<(String, GeneratedCppQO
     result.methods.push(CppFragment::Source(formatdoc! {
         r#"
         static_assert(alignof({cxx_qt_thread_ident}) <= alignof(::std::size_t), "unexpected aligment");
-        static_assert(sizeof({cxx_qt_thread_ident}) == sizeof(::std::size_t[4]), "unexpected size");
+        static_assert(sizeof({cxx_qt_thread_ident}) == sizeof(::std::size_t[2]), "unexpected size");
         "#
     }));
 
@@ -45,6 +45,7 @@ pub fn generate(qobject_idents: &QObjectNames) -> Result<(String, GeneratedCppQO
 mod tests {
     use super::*;
 
+    use crate::generator::cpp::property::tests::require_source;
     use crate::generator::naming::qobject::tests::create_qobjectname;
     use indoc::indoc;
     use pretty_assertions::assert_str_eq;
@@ -72,16 +73,12 @@ mod tests {
         // methods
         assert_eq!(generated.methods.len(), 1);
 
-        let source = if let CppFragment::Source(source) = &generated.methods[0] {
-            source
-        } else {
-            panic!("Expected source")
-        };
+        let source = require_source(&generated.methods[0]).unwrap();
         assert_str_eq!(
             source,
             indoc! {r#"
             static_assert(alignof(MyObjectCxxQtThread) <= alignof(::std::size_t), "unexpected aligment");
-            static_assert(sizeof(MyObjectCxxQtThread) == sizeof(::std::size_t[4]), "unexpected size");
+            static_assert(sizeof(MyObjectCxxQtThread) == sizeof(::std::size_t[2]), "unexpected size");
             "#}
         );
 
