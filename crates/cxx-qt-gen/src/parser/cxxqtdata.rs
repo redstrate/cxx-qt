@@ -6,6 +6,7 @@
 use super::qnamespace::ParsedQNamespace;
 use super::trait_impl::TraitImpl;
 use crate::naming::cpp::err_unsupported_item;
+use crate::parser::CaseConversion;
 use crate::{
     parser::{
         externcxxqt::ParsedExternCxxQt, inherit::ParsedInheritedMethod, method::ParsedMethod,
@@ -127,7 +128,13 @@ impl ParsedCxxQtData {
     }
 
     fn parse_foreign_mod_rust_qt(&mut self, mut foreign_mod: ItemForeignMod) -> Result<()> {
-        let attrs = require_attributes(&foreign_mod.attrs, &["namespace"])?;
+        // TODO: support cfg on foreign mod blocks
+        let attrs = require_attributes(
+            &foreign_mod.attrs,
+            &["namespace", "auto_cxx_name", "auto_rust_name"],
+        )?;
+
+        let auto_case = CaseConversion::from_attrs(&attrs)?;
 
         let namespace = attrs
             .get("namespace")
@@ -146,7 +153,8 @@ impl ParsedCxxQtData {
                 ForeignItem::Fn(foreign_fn) => {
                     // Test if the function is a signal
                     if attribute_get_path(&foreign_fn.attrs, &["qsignal"]).is_some() {
-                        let parsed_signal_method = ParsedSignal::parse(foreign_fn, safe_call)?;
+                        let parsed_signal_method =
+                            ParsedSignal::parse(foreign_fn, safe_call, auto_case)?;
                         self.signals.push(parsed_signal_method);
 
                         // Test if the function is an inheritance method
@@ -154,12 +162,12 @@ impl ParsedCxxQtData {
                         // Note that we need to test for qsignal first as qsignals have their own inherit meaning
                     } else if attribute_get_path(&foreign_fn.attrs, &["inherit"]).is_some() {
                         let parsed_inherited_method =
-                            ParsedInheritedMethod::parse(foreign_fn, safe_call)?;
+                            ParsedInheritedMethod::parse(foreign_fn, safe_call, auto_case)?;
 
                         self.inherited_methods.push(parsed_inherited_method);
                         // Remaining methods are either C++ methods or invokables
                     } else {
-                        let parsed_method = ParsedMethod::parse(foreign_fn, safe_call)?;
+                        let parsed_method = ParsedMethod::parse(foreign_fn, safe_call, auto_case)?;
                         self.methods.push(parsed_method);
                     }
                 }
@@ -171,6 +179,7 @@ impl ParsedCxxQtData {
                         foreign_alias,
                         namespace.as_deref(),
                         &self.module_ident,
+                        auto_case,
                     )?;
 
                     // Note that we assume a compiler error will occur later
@@ -265,6 +274,21 @@ mod tests {
                     static COUNTER: usize;
                 }
             }
+            {
+                // Unsupported name for case conversion
+                #[auto_cxx_name = Foo]
+                extern "RustQt" {}
+            }
+            {
+                // Auto case uses ident not string
+                #[auto_cxx_name = "Camel"]
+                extern "RustQt" {}
+            }
+            {
+                // Unsupported format for case conversion macro
+                #[auto_cxx_name(a, b)]
+                extern "RustQt" {}
+            }
         }
     }
 
@@ -321,6 +345,79 @@ mod tests {
         };
         let result = cxx_qt_data.parse_cxx_qt_item(item);
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_parse_auto_case_rustqt() {
+        let mut cxx_qt_data = create_parsed_cxx_qt_data();
+
+        let item: Item = parse_quote! {
+            #[auto_cxx_name]
+            unsafe extern "RustQt" {
+                fn foo_bar(self: &MyObject);
+            }
+        };
+        cxx_qt_data.parse_cxx_qt_item(item).unwrap();
+        assert_eq!(cxx_qt_data.methods.len(), 1);
+        assert_eq!(cxx_qt_data.methods[0].name.cxx_unqualified(), "fooBar");
+    }
+
+    #[test]
+    fn test_parse_auto_case_explicit() {
+        let mut cxx_qt_data = create_parsed_cxx_qt_data();
+
+        let item: Item = parse_quote! {
+            #[auto_cxx_name = Snake]
+            #[auto_rust_name = Snake]
+            unsafe extern "RustQt" {
+                fn fooBar(self: &MyObject);
+            }
+        };
+        cxx_qt_data.parse_cxx_qt_item(item).unwrap();
+        assert_eq!(cxx_qt_data.methods.len(), 1);
+        assert_eq!(cxx_qt_data.methods[0].name.cxx_unqualified(), "foo_bar");
+        assert_eq!(cxx_qt_data.methods[0].name.rust_unqualified(), "foo_bar");
+    }
+
+    #[test]
+    fn test_parse_auto_case_override() {
+        let mut cxx_qt_data = create_parsed_cxx_qt_data();
+
+        let item: Item = parse_quote! {
+            #[auto_cxx_name]
+            unsafe extern "RustQt" {
+                #[cxx_name = "renamed"]
+                fn foo_bar(self: &MyObject);
+            }
+        };
+        cxx_qt_data.parse_cxx_qt_item(item).unwrap();
+        assert_eq!(cxx_qt_data.methods.len(), 1);
+        assert_eq!(cxx_qt_data.methods[0].name.cxx_unqualified(), "renamed");
+    }
+
+    #[test]
+    fn test_parse_auto_case_foreign() {
+        let mut cxx_qt_data = create_parsed_cxx_qt_data();
+
+        let item: Item = parse_quote! {
+            #[auto_rust_name]
+            unsafe extern "C++Qt" {
+                #[qobject]
+                type MyObject;
+
+                #[qsignal]
+                fn fooBar(self: Pin<&mut MyObject>);
+            }
+        };
+        cxx_qt_data.parse_cxx_qt_item(item).unwrap();
+        assert_eq!(cxx_qt_data.extern_cxxqt_blocks.len(), 1);
+        assert_eq!(cxx_qt_data.extern_cxxqt_blocks[0].signals.len(), 1);
+        assert_eq!(
+            cxx_qt_data.extern_cxxqt_blocks[0].signals[0]
+                .name
+                .rust_unqualified(),
+            "foo_bar"
+        );
     }
 
     #[test]
@@ -479,7 +576,7 @@ mod tests {
         assert_eq!(signals[0].name, Name::new(format_ident!("ready")));
         assert_eq!(
             signals[1].name,
-            Name::new(format_ident!("data_changed")).with_cxx_name("cppDataChanged".to_owned())
+            Name::mock_name_with_cxx("data_changed", "cppDataChanged")
         );
         assert!(!signals[0].inherit);
         assert!(signals[1].inherit);
@@ -491,6 +588,7 @@ mod tests {
         let block: Item = parse_quote! {
             extern "RustQt" {
                 #[qsignal]
+                #[cxx_name = "unsafeSignal"]
                 unsafe fn unsafe_signal(self: Pin<&mut MyObject>, arg: *mut T);
             }
         };
@@ -504,7 +602,7 @@ mod tests {
         assert_eq!(signals[0].parameters[0].ident, "arg");
         assert_eq!(
             signals[0].name,
-            Name::new(format_ident!("unsafe_signal")).with_cxx_name("unsafeSignal".to_owned())
+            Name::mock_name_with_cxx("unsafe_signal", "unsafeSignal")
         );
         assert!(!signals[0].inherit);
     }

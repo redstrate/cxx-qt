@@ -15,10 +15,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased](https://github.com/KDAB/cxx-qt/compare/v0.6.1...HEAD)
+## [Unreleased](https://github.com/KDAB/cxx-qt/compare/v0.7.0...HEAD)
+
+### Fixed
+
+- Build warnings due to unused unsafe blocks since CXX 1.0.130
+
+## [0.7.0](https://github.com/KDAB/cxx-qt/compare/v0.6.1...v0.7.0) - 2024-10-30
 
 ### Added
 
+- `#[auto_cxx_name]` and `#[auto_rust_name]` attributes for `extern` blocks, which will convert the case of names, automatically camelCase for cxx, and snake_case for rust
 - Support for further types: `QLine`, `QLineF`, `QImage`, `QPainter`, `QFont`, `QPen`, `QPolygon`, `QPolygonF`, `QRegion`, `QAnyStringView`
 - `internal_pointer_mut()` function on `QModelIndex`
 - `c_void` in CXX-Qt-lib for easy access to `void *`
@@ -34,11 +41,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- `VCPKG` is now set to off by default and packages are only built in release mode in the cache
+- `VCPKG` is now being removed entirely
 - Connection now return a `QMetaObjectConnectionGuard` and `QMetaObjectConnection` is a separate type
 - Internal `cxx-qt` headers have moved to the namespace `cxxqt1` and the folder `cxx-qt`
 - `cxx-qt-gen` now does not generate code requiring `cxx-qt-lib`, this allows for `cxx-qt-lib` to be optional
-- `cxx-qt-lib` headers must be given to `cxx-qt-build` with `.with_opts(cxx_qt_lib_headers::build_opts())`
 - File name is used for CXX bridges rather than module name to match upstream
 - `#[qobject]` attribute is now optional on types in `extern "RustQt"`
 - `#[qobject]` attribute is now required on types in `extern "C++Qt"`
@@ -52,6 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `cxx_file_stem` has been removed from `#[cxx_qt::bridge]` and the source file name is now used for generated headers similar to CXX
 - Base attribute now takes an ident not a string, e.g. `#[base = ParentClass]` instead of `#[base = "ParentClass"]`
 - No Cxx-qt-lib features are on by default now, instead we have a 'full' feature for the previously enabled features, making them opt in
+- Removed implicit auto camel conversion with no attributes, instead use cxx_name and rust_name like CXX (this may come back but be explicit opt-in)
 
 ### Removed
 

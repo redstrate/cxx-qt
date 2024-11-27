@@ -3,24 +3,11 @@
 //
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
+use crate::parser::CaseConversion;
 use crate::syntax::{attribute::attribute_get_path, expr::expr_to_string};
-use convert_case::{Case, Casing};
+use convert_case::Casing;
 use quote::format_ident;
 use syn::{spanned::Spanned, Attribute, Error, Ident, Path, Result};
-
-pub enum AutoCamel {
-    Enabled,
-    Disabled,
-}
-
-impl AutoCamel {
-    pub fn as_bool(&self) -> bool {
-        match self {
-            AutoCamel::Enabled => true,
-            AutoCamel::Disabled => false,
-        }
-    }
-}
 
 /// This struct contains all names a certain syntax element may have
 ///
@@ -97,30 +84,6 @@ impl Name {
         }
     }
 
-    /// Parse a name from an an identifier and a list of attributes.
-    ///
-    /// This variant assumes that the name is contained in an `extern "Rust"` block.
-    /// If no cxx_name is set, it generates a camelCase cxx_name from the rust name.
-    ///
-    /// See also: [Self::from_ident_and_attrs]
-    pub fn from_rust_ident_and_attrs(
-        ident: &Ident,
-        attrs: &[Attribute],
-        parent_namespace: Option<&str>,
-        module: Option<&Ident>,
-    ) -> Result<Self> {
-        let name = Self::from_ident_and_attrs(ident, attrs, parent_namespace, module)?;
-        // No explicit cxx_name set, generate an appropriate camelCase cxx_name
-        if name.cxx.is_none() {
-            let rust_string = name.rust.to_string();
-            let cxx = rust_string.to_case(Case::Camel);
-            if cxx != rust_string {
-                return Ok(name.with_cxx_name(cxx));
-            }
-        }
-        Ok(name)
-    }
-
     /// Parse a name from an identifier and a list of attributes.
     ///
     /// This deciphers the rust_name, cxx_name and namespace attributes, including
@@ -130,6 +93,7 @@ impl Name {
         attrs: &[Attribute],
         parent_namespace: Option<&str>,
         module: Option<&Ident>,
+        auto_case: CaseConversion,
     ) -> Result<Self> {
         // Find if there is a namespace (for C++ generation)
         let mut namespace = if let Some(attr) = attribute_get_path(attrs, &["namespace"]) {
@@ -168,38 +132,44 @@ impl Name {
             namespace,
             module: module.cloned().map(Path::from),
         }
-        .with_options(cxx_name, rust_name, AutoCamel::Disabled))
+        .with_options(cxx_name, rust_name, auto_case))
     }
 
     /// Applies naming options to an existing name, applying logic about what should cause renaming
     pub fn with_options(
         self,
-        cxx: Option<String>,
-        rust: Option<Ident>,
-        auto_camel: AutoCamel,
+        mut cxx_name: Option<String>,
+        mut rust_name: Option<Ident>,
+        auto_case: CaseConversion,
     ) -> Self {
-        let mut cxx_ident = cxx.clone();
-        let rust_ident = if let Some(rust_ident) = rust {
-            // If we have a rust_name, but no cxx_name, the original ident is the cxx_name.
-            if cxx.is_none() {
-                cxx_ident = Some(self.rust.to_string());
-            };
-
-            rust_ident
-        } else {
-            // If we have no rust_name and no cxx_name, the original ident is the cxx_name ONLY if auto converting.
-            // Otherwise it stays as the original cxx Option
-            if cxx.is_none() && auto_camel.as_bool() {
-                cxx_ident = Some(self.rust.to_string().to_case(Case::Camel));
+        // Determine any automatic casing when there is no cxx_name or rust_name
+        if cxx_name.is_none() && rust_name.is_none() {
+            if let Some(case) = auto_case.cxx {
+                cxx_name = Some(self.rust_unqualified().to_string().to_case(case));
             }
-            self.rust.clone()
-        };
 
-        Self {
-            rust: rust_ident,
-            cxx: cxx_ident,
-            ..self
+            if let Some(case) = auto_case.rust {
+                rust_name = Some(format_ident!(
+                    "{}",
+                    self.rust_unqualified().to_string().to_case(case)
+                ));
+            }
         }
+
+        // Use the rust name if there is one or fallback to the original ident
+        let rust = rust_name.unwrap_or_else(|| self.rust.clone());
+
+        // Use the cxx name if there is one or fallback to the original ident
+        // But only if it is different to the resultant rust ident
+        let cxx = cxx_name.or_else(|| {
+            if rust != self.rust {
+                Some(self.rust.to_string())
+            } else {
+                None
+            }
+        });
+
+        Self { rust, cxx, ..self }
     }
 
     /// Get the unqualified name of the type in C++.
@@ -260,7 +230,7 @@ impl Name {
     /// 2. Any attributes like cxx_name and namespace
     /// 3. The rust_qualified path to access the function (if not needed use _ during destructuring)
     pub fn into_cxx_parts(self) -> (Ident, Vec<Attribute>, Path) {
-        let rust_qualified = self.rust_qualified().clone();
+        let rust_qualified = self.rust_qualified();
         let cxx_name: Option<Attribute> = self.cxx.map(|cxx| {
             syn::parse_quote! { #[cxx_name = #cxx] }
         });
@@ -334,6 +304,12 @@ impl Name {
         }
         .with_namespace(namespace.into())
         .with_module(Path::from(format_ident!("qobject")))
+    }
+
+    #[cfg(test)]
+    /// Helper for creating cxx_named Names, usually for camelcase cxx names
+    pub fn mock_name_with_cxx(name: &str, cxx: &str) -> Name {
+        Name::new(format_ident!("{name}")).with_cxx_name(cxx.to_string())
     }
 }
 

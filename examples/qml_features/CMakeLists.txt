@@ -28,7 +28,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(CXXQT_QTCOMPONENTS Core Gui Qml QuickControls2 QuickTest Test)
+set(CXXQT_QTCOMPONENTS Core Gui Qml Quick QuickControls2 QuickTest Test)
 if(NOT BUILD_WASM)
     set(CXXQT_QTCOMPONENTS ${CXXQT_QTCOMPONENTS} QmlImportScanner)
 endif()
@@ -53,12 +53,21 @@ if(NOT CxxQt_FOUND)
 endif()
 
 set(CRATE qml_features)
-cxx_qt_import_crate(MANIFEST_PATH rust/Cargo.toml CRATES ${CRATE})
+cxx_qt_import_crate(
+    MANIFEST_PATH rust/Cargo.toml
+    CRATES ${CRATE}
+    QT_MODULES Qt::Core Qt::Gui Qt::Qml Qt::Quick
+)
 cxx_qt_import_qml_module(${CRATE}_qml
     URI "com.kdab.cxx_qt.demo"
     SOURCE_CRATE ${CRATE})
 
 if(BUILD_WASM)
+    # Add -DRUST_CXX_NO_EXCEPTIONS to CXXFLAGS, as WASM does not support exceptions
+    set(EMSCRIPTEN_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+    list(APPEND EMSCRIPTEN_CXX_FLAGS "-DRUST_CXX_NO_EXCEPTIONS")
+    corrosion_set_env_vars(${CRATE} "CXXFLAGS=${EMSCRIPTEN_CXX_FLAGS}")
+
     # Currently need to use qt_add_executable
     # for WASM builds, otherwise there is no
     # HTML output.

@@ -1,4 +1,5 @@
 #[cxx::bridge(namespace = "cxx_qt::my_object")]
+#[allow(unused_unsafe)]
 mod ffi {
     unsafe extern "C++" {
         include ! (< QtCore / QObject >);
@@ -84,29 +85,27 @@ mod ffi {
         type MyObjectRust;
     }
     extern "Rust" {
-        #[cxx_name = "myInvokable"]
+        #[cxx_name = "my_invokable"]
         #[namespace = "cxx_qt::my_object"]
         #[doc(hidden)]
         fn my_invokable(self: &MyObject, qenum: MyEnum, other_qenum: MyOtherEnum);
     }
     extern "Rust" {
         #[cxx_name = "createRs"]
-        #[namespace = "cxx_qt::my_object::cxx_qt_my_object"]
-        fn create_rs_my_object_rust() -> Box<MyObjectRust>;
+        #[namespace = "cxx_qt::my_object::cxx_qt_MyObject"]
+        fn create_rs_MyObjectRust() -> Box<MyObjectRust>;
     }
     unsafe extern "C++" {
         #[doc(hidden)]
         #[cxx_name = "unsafeRust"]
         #[namespace = "rust::cxxqt1"]
-        fn cxx_qt_ffi_my_object_unsafe_rust(outer: &MyObject) -> &MyObjectRust;
+        fn cxx_qt_ffi_MyObject_unsafeRust(outer: &MyObject) -> &MyObjectRust;
     }
     unsafe extern "C++" {
         #[doc(hidden)]
         #[cxx_name = "unsafeRustMut"]
         #[namespace = "rust::cxxqt1"]
-        fn cxx_qt_ffi_my_object_unsafe_rust_mut(
-            outer: Pin<&mut MyObject>,
-        ) -> Pin<&mut MyObjectRust>;
+        fn cxx_qt_ffi_MyObject_unsafeRustMut(outer: Pin<&mut MyObject>) -> Pin<&mut MyObjectRust>;
     }
     unsafe extern "C++" {
         #[doc = "The C++ type for the QObject "]
@@ -127,59 +126,61 @@ mod ffi {
     }
     extern "Rust" {
         #[cxx_name = "createRs"]
-        #[namespace = "cxx_qt::my_object::cxx_qt_my_renamed_object"]
-        fn create_rs_internal_object() -> Box<InternalObject>;
+        #[namespace = "cxx_qt::my_object::cxx_qt_MyRenamedObject"]
+        fn create_rs_InternalObject() -> Box<InternalObject>;
     }
     unsafe extern "C++" {
         #[doc(hidden)]
         #[cxx_name = "unsafeRust"]
         #[namespace = "rust::cxxqt1"]
-        fn cxx_qt_ffi_cxx_name_unsafe_rust(outer: &MyRenamedObject) -> &InternalObject;
+        fn cxx_qt_ffi_CxxName_unsafeRust(outer: &MyRenamedObject) -> &InternalObject;
     }
     unsafe extern "C++" {
         #[doc(hidden)]
         #[cxx_name = "unsafeRustMut"]
         #[namespace = "rust::cxxqt1"]
-        fn cxx_qt_ffi_cxx_name_unsafe_rust_mut(
+        fn cxx_qt_ffi_CxxName_unsafeRustMut(
             outer: Pin<&mut MyRenamedObject>,
         ) -> Pin<&mut InternalObject>;
     }
 }
 #[doc(hidden)]
-pub fn create_rs_my_object_rust() -> std::boxed::Box<MyObjectRust> {
+#[allow(clippy::unnecessary_box_returns)]
+pub fn create_rs_MyObjectRust() -> std::boxed::Box<MyObjectRust> {
     std::boxed::Box::new(core::default::Default::default())
 }
 impl ::core::ops::Deref for ffi::MyObject {
     type Target = MyObjectRust;
     fn deref(&self) -> &Self::Target {
-        ffi::cxx_qt_ffi_my_object_unsafe_rust(self)
+        ffi::cxx_qt_ffi_MyObject_unsafeRust(self)
     }
 }
 impl ::cxx_qt::CxxQtType for ffi::MyObject {
     type Rust = MyObjectRust;
     fn rust(&self) -> &Self::Rust {
-        ffi::cxx_qt_ffi_my_object_unsafe_rust(self)
+        ffi::cxx_qt_ffi_MyObject_unsafeRust(self)
     }
     fn rust_mut(self: core::pin::Pin<&mut Self>) -> core::pin::Pin<&mut Self::Rust> {
-        ffi::cxx_qt_ffi_my_object_unsafe_rust_mut(self)
+        ffi::cxx_qt_ffi_MyObject_unsafeRustMut(self)
     }
 }
 #[doc(hidden)]
-pub fn create_rs_internal_object() -> std::boxed::Box<InternalObject> {
+#[allow(clippy::unnecessary_box_returns)]
+pub fn create_rs_InternalObject() -> std::boxed::Box<InternalObject> {
     std::boxed::Box::new(core::default::Default::default())
 }
 impl ::core::ops::Deref for ffi::MyRenamedObject {
     type Target = InternalObject;
     fn deref(&self) -> &Self::Target {
-        ffi::cxx_qt_ffi_cxx_name_unsafe_rust(self)
+        ffi::cxx_qt_ffi_CxxName_unsafeRust(self)
     }
 }
 impl ::cxx_qt::CxxQtType for ffi::MyRenamedObject {
     type Rust = InternalObject;
     fn rust(&self) -> &Self::Rust {
-        ffi::cxx_qt_ffi_cxx_name_unsafe_rust(self)
+        ffi::cxx_qt_ffi_CxxName_unsafeRust(self)
     }
     fn rust_mut(self: core::pin::Pin<&mut Self>) -> core::pin::Pin<&mut Self::Rust> {
-        ffi::cxx_qt_ffi_cxx_name_unsafe_rust_mut(self)
+        ffi::cxx_qt_ffi_CxxName_unsafeRustMut(self)
     }
 }

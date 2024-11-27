@@ -11,11 +11,12 @@ authors = ["Be Wilson <be.wilson@kdab.com>"]
 license.workspace = true
 description = "Build script helper for linking Qt libraries and using moc code generator. Intended to be used together with cc, cpp_build, or cxx_build"
 repository.workspace = true
+rust-version.workspace = true
 
 [dependencies]
 cc.workspace = true
 versions = "6.3"
-thiserror = "1.0"
+thiserror.workspace = true
 
 [features]
 # When Cargo links an executable, whether a bin crate or test executable,
@@ -29,3 +30,6 @@ thiserror = "1.0"
 #
 # When linking Qt dynamically, this makes no difference.
 link_qt_object_files = []
+
+[lints]
+workspace = true

@@ -313,7 +313,8 @@ fn main() {
     let mut interface = cxx_qt_build::Interface::default()
         .initializer("src/core/init.cpp")
         .export_include_prefixes([])
-        .export_include_directory(header_dir(), "cxx-qt-lib");
+        .export_include_directory(header_dir(), "cxx-qt-lib")
+        .reexport_dependency("cxx-qt");
 
     if qt_gui_enabled() {
         interface = interface
@@ -350,10 +351,10 @@ fn main() {
     builder = builder.cc_builder(move |cc| {
         for cpp_file in &cpp_files {
             cc.file(format!("src/{cpp_file}.cpp"));
-            println!("cargo:rerun-if-changed=src/{cpp_file}.cpp");
+            println!("cargo::rerun-if-changed=src/{cpp_file}.cpp");
         }
         cc.file("src/qt_types.cpp");
-        println!("cargo:rerun-if-changed=src/qt_types.cpp");
+        println!("cargo::rerun-if-changed=src/qt_types.cpp");
     });
 
     builder.build();

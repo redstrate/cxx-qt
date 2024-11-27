@@ -101,6 +101,7 @@ pub fn generate_rust_signal(
     let cpp_ident = idents.name.cxx_unqualified();
 
     let doc_comments = &signal.docs;
+    let cfgs = &signal.cfgs;
     let namespace = if let Some(namespace) = qobject_name.namespace() {
         quote! { #[namespace = #namespace ] }
     } else {
@@ -118,6 +119,7 @@ pub fn generate_rust_signal(
         cxx_bridge.push(quote! {
             #unsafe_block extern "C++" {
                 #[cxx_name = #cpp_ident]
+                #(#cfgs)*
                 #(#doc_comments)*
                 #namespace
                 #unsafe_call fn #signal_ident_cpp(#parameter_signatures) #return_type;
@@ -417,6 +419,7 @@ mod tests {
     #[test]
     fn test_generate_rust_signal_parameters() {
         let method: ForeignItemFn = parse_quote! {
+            #[cxx_name = "dataChanged"]
             fn data_changed(self: Pin<&mut MyObject>, trivial: i32, opaque: UniquePtr<QColor>);
         };
         let qsignal = ParsedSignal::mock(&method);
@@ -558,6 +561,7 @@ mod tests {
     #[test]
     fn test_generate_rust_signal_unsafe() {
         let method = parse_quote! {
+            #[cxx_name = "unsafeSignal"]
             unsafe fn unsafe_signal(self: Pin<&mut MyObject>, param: *mut T);
         };
         let qsignal = ParsedSignal::mock(&method);

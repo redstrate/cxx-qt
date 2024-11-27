@@ -119,7 +119,7 @@ public:
   ::std::int32_t const& getPropertyName() const noexcept;
   Q_SLOT void setPropertyName(::std::int32_t value) noexcept;
   Q_SIGNAL void propertyNameChanged();
-  Q_INVOKABLE void invokableName() noexcept;
+  Q_INVOKABLE void invokable_name() noexcept;
   Q_SIGNAL void ready();
   explicit MyObject(QObject* parent = nullptr);
 };
@@ -164,6 +164,7 @@ public:
   Q_SLOT void setPropertyName(::std::int32_t value) noexcept;
   Q_SIGNAL void propertyNameChanged();
   Q_INVOKABLE void invokableName() noexcept;
+  void myRenamedFunction() const noexcept;
   Q_SIGNAL void ready();
   explicit SecondObject(QObject* parent = nullptr);
 };

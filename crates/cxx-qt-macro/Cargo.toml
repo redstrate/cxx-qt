@@ -13,6 +13,7 @@ license.workspace = true
 description = "A set of macros for Qt/C++ interop in Rust"
 repository.workspace = true
 homepage = "https://kdab.github.io/cxx-qt/book/"
+rust-version.workspace = true
 
 [lib]
 proc-macro = true
@@ -25,3 +26,6 @@ syn.workspace = true
 [dev-dependencies]
 cxx.workspace = true
 cxx-qt.workspace = true
+
+[lints]
+workspace = true

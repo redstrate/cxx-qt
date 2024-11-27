@@ -43,7 +43,18 @@ if(NOT CxxQt_FOUND)
 endif()
 
 set(CRATE qt_types_standalone)
-cxx_qt_import_crate(MANIFEST_PATH rust/Cargo.toml CRATES ${CRATE})
+cxx_qt_import_crate(
+    MANIFEST_PATH rust/Cargo.toml
+    CRATES ${CRATE}
+    QT_MODULES Qt::Core Qt::Gui Qt::Qml
+)
+
+if(BUILD_WASN)
+    # Add -DRUST_CXX_NO_EXCEPTIONS to CXXFLAGS, as WASM does not support exceptions
+    set(EMSCRIPTEN_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+    list(APPEND EMSCRIPTEN_CXX_FLAGS "-DRUST_CXX_NO_EXCEPTIONS")
+    corrosion_set_env_vars(${CRATE} "CXXFLAGS=${EMSCRIPTEN_CXX_FLAGS}")
+endif()
 
 add_executable(${APP_NAME}
     cpp/main.cpp
@@ -101,3 +112,9 @@ target_link_libraries(${APP_NAME} PRIVATE
     Qt::Qml
     Qt::QuickControls2
 )
+
+if (APPLE AND USE_QT5)
+    # When building in CI with Qt 5 if we don't link to CoreFoundation
+    # we get linker failures due to functions related to timezones
+    target_link_libraries(${APP_NAME} PRIVATE "-framework CoreFoundation")
+endif()

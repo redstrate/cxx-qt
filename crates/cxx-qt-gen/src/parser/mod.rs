@@ -21,14 +21,70 @@ use crate::{
     naming::TypeNames,
     syntax::{expr::expr_to_string, path::path_compare_str, safety::Safety},
 };
+use convert_case::Case;
 use cxxqtdata::ParsedCxxQtData;
 use std::collections::BTreeMap;
 use syn::{
     punctuated::Punctuated,
     spanned::Spanned,
     token::{Brace, Semi},
-    Attribute, Error, ForeignItemFn, Ident, Item, ItemMod, Meta, Result, Token, Visibility,
+    Attribute, Error, Expr, ForeignItemFn, Ident, Item, ItemMod, Meta, Result, Token, Visibility,
 };
+
+#[derive(Copy, Clone)]
+pub struct CaseConversion {
+    pub cxx: Option<Case>,
+    pub rust: Option<Case>,
+}
+
+/// Used to match the auto_case attributes and turn it into a Case to convert to
+fn meta_to_case(attr: &Attribute, default: Case) -> Result<Case> {
+    match &attr.meta {
+        Meta::Path(_) => Ok(default),
+        Meta::NameValue(case) => match &case.value {
+            Expr::Path(expr_path) => match expr_path.path.require_ident()?.to_string().as_str() {
+                "Camel" => Ok(Case::Camel),
+                "Snake" => Ok(Case::Snake),
+                _ => Err(Error::new(
+                    attr.span(),
+                    "Invalid case! You can use either `Camel` or `Snake`",
+                )),
+            },
+            _ => Err(Error::new(
+                attr.span(),
+                "Case should be specified as an identifier! Like `#[auto_cxx_name = Camel]`",
+            )),
+        },
+        _ => Err(Error::new(
+            attr.span(),
+            "Invalid attribute format! Use like `auto_cxx_name` or `auto_cxx_name = Camel`",
+        )),
+    }
+}
+
+impl CaseConversion {
+    pub fn none() -> Self {
+        Self {
+            cxx: None,
+            rust: None,
+        }
+    }
+
+    /// Create a CaseConversion object from a Map of attributes, collected using `require_attributes`
+    /// Parses both `auto_cxx_name` and `auto_cxx_name = Camel`
+    pub fn from_attrs(attrs: &BTreeMap<&str, &Attribute>) -> Result<Self> {
+        let rust = attrs
+            .get("auto_rust_name")
+            .map(|attr| meta_to_case(attr, Case::Snake))
+            .transpose()?;
+        let cxx = attrs
+            .get("auto_cxx_name")
+            .map(|attr| meta_to_case(attr, Case::Camel))
+            .transpose()?;
+
+        Ok(Self { rust, cxx })
+    }
+}
 
 /// Validates that an invokable is either unsafe, or is in an unsafe extern block
 fn check_safety(method: &ForeignItemFn, safety: &Safety) -> Result<()> {
@@ -40,6 +96,15 @@ fn check_safety(method: &ForeignItemFn, safety: &Safety) -> Result<()> {
     } else {
         Ok(())
     }
+}
+
+/// Iterate the attributes of the method to extract cfg attributes
+pub fn extract_cfgs(attrs: &[Attribute]) -> Vec<Attribute> {
+    attrs
+        .iter()
+        .filter(|attr| path_compare_str(attr.meta.path(), &["cfg"]))
+        .cloned()
+        .collect()
 }
 
 /// Iterate the attributes of the method to extract Doc attributes (doc comments are parsed as this)

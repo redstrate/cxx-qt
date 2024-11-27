@@ -22,20 +22,23 @@ pub mod qobject {
         #[qobject]
         #[qml_element]
         #[qproperty(bool, connected, READ, NOTIFY = connected_state_changed)]
-        #[qproperty(QUrl, connected_url, READ, WRITE = set_url, NOTIFY = connected_state_changed, RESET = reset_url)]
-        #[qproperty(QUrl, previous_connected_url, READ, NOTIFY = connected_state_changed)]
-        #[qproperty(QString, status_message, READ, NOTIFY = connected_state_changed)]
+        #[qproperty(QUrl, connected_url, cxx_name = "connectedUrl", READ, WRITE = set_url, NOTIFY = connected_state_changed, RESET = reset_url)]
+        #[qproperty(QUrl, previous_connected_url, cxx_name = "previousConnectedUrl", READ, NOTIFY = connected_state_changed)]
+        #[qproperty(QString, status_message, cxx_name = "statusMessage", READ, NOTIFY = connected_state_changed)]
         type RustProperties = super::RustPropertiesRust;
         // ANCHOR_END: book_properties_signature
 
         /// Custom on changed signal, used for all the properties
         #[qsignal]
+        #[cxx_name = "connectedStateChanged"]
         fn connected_state_changed(self: Pin<&mut RustProperties>);
 
         /// Custom setter for connected_url, which also handles setting the other qproperties
+        #[cxx_name = "setUrl"]
         fn set_url(self: Pin<&mut RustProperties>, url: QUrl);
 
         /// Resets value of connected_url to empty, as well as calling the other disconnected logic
+        #[cxx_name = "resetUrl"]
         fn reset_url(self: Pin<&mut RustProperties>);
     }
 

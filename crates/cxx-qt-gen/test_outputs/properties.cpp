@@ -116,6 +116,62 @@ MyObject_trivialChangedConnect(
 // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=56480
 namespace rust::cxxqt1 {
 template<>
+SignalHandler<
+  ::cxx_qt::my_object::rust::cxxqtgen1::
+    MyObjectCxxQtSignalParamspropAutoCxxNameChanged*>::~SignalHandler() noexcept
+{
+  if (data[0] == nullptr && data[1] == nullptr) {
+    return;
+  }
+
+  drop_MyObject_signal_handler_propAutoCxxNameChanged(::std::move(*this));
+}
+
+template<>
+template<>
+void
+SignalHandler<::cxx_qt::my_object::rust::cxxqtgen1::
+                MyObjectCxxQtSignalParamspropAutoCxxNameChanged*>::
+operator()<cxx_qt::my_object::MyObject&>(cxx_qt::my_object::MyObject& self)
+{
+  call_MyObject_signal_handler_propAutoCxxNameChanged(*this, self);
+}
+
+static_assert(
+  alignof(SignalHandler<::cxx_qt::my_object::rust::cxxqtgen1::
+                          MyObjectCxxQtSignalParamspropAutoCxxNameChanged*>) <=
+    alignof(::std::size_t),
+  "unexpected aligment");
+static_assert(
+  sizeof(SignalHandler<::cxx_qt::my_object::rust::cxxqtgen1::
+                         MyObjectCxxQtSignalParamspropAutoCxxNameChanged*>) ==
+    sizeof(::std::size_t[2]),
+  "unexpected size");
+} // namespace rust::cxxqt1
+
+namespace cxx_qt::my_object::rust::cxxqtgen1 {
+::QMetaObject::Connection
+MyObject_propAutoCxxNameChangedConnect(
+  cxx_qt::my_object::MyObject& self,
+  ::cxx_qt::my_object::rust::cxxqtgen1::
+    MyObjectCxxQtSignalHandlerpropAutoCxxNameChanged closure,
+  ::Qt::ConnectionType type)
+{
+  return ::QObject::connect(
+    &self,
+    &cxx_qt::my_object::MyObject::propAutoCxxNameChanged,
+    &self,
+    [&, closure = ::std::move(closure)]() mutable {
+      closure.template operator()<cxx_qt::my_object::MyObject&>(self);
+    },
+    type);
+}
+} // namespace cxx_qt::my_object::rust::cxxqtgen1
+
+// Define namespace otherwise we hit a GCC bug
+// https://gcc.gnu.org/bugzilla/show_bug.cgi?id=56480
+namespace rust::cxxqt1 {
+template<>
 SignalHandler<::cxx_qt::my_object::rust::cxxqtgen1::
                 MyObjectCxxQtSignalParamscustomFunctionPropChanged*>::
   ~SignalHandler() noexcept
@@ -287,47 +343,49 @@ MyObject_named_prop_2ChangedConnect(
 namespace rust::cxxqt1 {
 template<>
 SignalHandler<
-  ::cxx_qt::my_object::rust::cxxqtgen1::MyObjectCxxQtSignalParamsmyOnChanged*>::
-  ~SignalHandler() noexcept
+  ::cxx_qt::my_object::rust::cxxqtgen1::
+    MyObjectCxxQtSignalParamsmy_on_changed*>::~SignalHandler() noexcept
 {
   if (data[0] == nullptr && data[1] == nullptr) {
     return;
   }
 
-  drop_MyObject_signal_handler_myOnChanged(::std::move(*this));
+  drop_MyObject_signal_handler_my_on_changed(::std::move(*this));
 }
 
 template<>
 template<>
 void
-SignalHandler<
-  ::cxx_qt::my_object::rust::cxxqtgen1::MyObjectCxxQtSignalParamsmyOnChanged*>::
+SignalHandler<::cxx_qt::my_object::rust::cxxqtgen1::
+                MyObjectCxxQtSignalParamsmy_on_changed*>::
 operator()<cxx_qt::my_object::MyObject&>(cxx_qt::my_object::MyObject& self)
 {
-  call_MyObject_signal_handler_myOnChanged(*this, self);
+  call_MyObject_signal_handler_my_on_changed(*this, self);
 }
 
-static_assert(alignof(SignalHandler<::cxx_qt::my_object::rust::cxxqtgen1::
-                                      MyObjectCxxQtSignalParamsmyOnChanged*>) <=
-                alignof(::std::size_t),
-              "unexpected aligment");
-static_assert(sizeof(SignalHandler<::cxx_qt::my_object::rust::cxxqtgen1::
-                                     MyObjectCxxQtSignalParamsmyOnChanged*>) ==
-                sizeof(::std::size_t[2]),
-              "unexpected size");
+static_assert(
+  alignof(SignalHandler<::cxx_qt::my_object::rust::cxxqtgen1::
+                          MyObjectCxxQtSignalParamsmy_on_changed*>) <=
+    alignof(::std::size_t),
+  "unexpected aligment");
+static_assert(
+  sizeof(SignalHandler<::cxx_qt::my_object::rust::cxxqtgen1::
+                         MyObjectCxxQtSignalParamsmy_on_changed*>) ==
+    sizeof(::std::size_t[2]),
+  "unexpected size");
 } // namespace rust::cxxqt1
 
 namespace cxx_qt::my_object::rust::cxxqtgen1 {
 ::QMetaObject::Connection
-MyObject_myOnChangedConnect(
+MyObject_my_on_changedConnect(
   cxx_qt::my_object::MyObject& self,
-  ::cxx_qt::my_object::rust::cxxqtgen1::MyObjectCxxQtSignalHandlermyOnChanged
+  ::cxx_qt::my_object::rust::cxxqtgen1::MyObjectCxxQtSignalHandlermy_on_changed
     closure,
   ::Qt::ConnectionType type)
 {
   return ::QObject::connect(
     &self,
-    &cxx_qt::my_object::MyObject::myOnChanged,
+    &cxx_qt::my_object::MyObject::my_on_changed,
     &self,
     [&, closure = ::std::move(closure)]() mutable {
       closure.template operator()<cxx_qt::my_object::MyObject&>(self);
@@ -340,7 +398,7 @@ namespace cxx_qt::my_object {
 MyObject::MyObject(QObject* parent)
   : QObject(parent)
   , ::rust::cxxqt1::CxxQtType<MyObjectRust>(
-      ::cxx_qt::my_object::cxx_qt_my_object::createRs())
+      ::cxx_qt::my_object::cxx_qt_MyObject::createRs())
 {
 }
 

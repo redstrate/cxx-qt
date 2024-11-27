@@ -65,8 +65,10 @@ endif()
 
 # ANCHOR: book_cmake_use_cxx_qt
 # CXX-Qt (using Corrosion) creates a CMake target with the same name as the crate.
-cxx_qt_import_crate(MANIFEST_PATH rust/Cargo.toml CRATES qml_minimal)
-target_link_libraries(qml_minimal INTERFACE Qt::Core Qt::Gui Qt::Qml Qt::QuickControls2)
+cxx_qt_import_crate(
+    MANIFEST_PATH rust/Cargo.toml 
+    CRATES qml_minimal 
+    QT_MODULES Qt::Core Qt::Gui Qt::Qml Qt::QuickControls2)
 
 cxx_qt_import_qml_module(qml_minimal_qml_module
     URI "com.kdab.cxx_qt.demo"
@@ -75,6 +77,11 @@ cxx_qt_import_qml_module(qml_minimal_qml_module
 
 # Define the executable with the C++ source
 if(BUILD_WASM)
+    # Add -DRUST_CXX_NO_EXCEPTIONS to CXXFLAGS, as WASM does not support exceptions
+    set(EMSCRIPTEN_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+    list(APPEND EMSCRIPTEN_CXX_FLAGS "-DRUST_CXX_NO_EXCEPTIONS")
+    corrosion_set_env_vars(qml_minimal "CXXFLAGS=${EMSCRIPTEN_CXX_FLAGS}")
+
     # Currently need to use qt_add_executable
     # for WASM builds, otherwise there is no
     # HTML output.

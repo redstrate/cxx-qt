@@ -21,40 +21,41 @@ concurrency:
   cancel-in-progress: true
 jobs:
   clang_format:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       # Note ensure that matrix runner is updated too
       - run: |
-          pip install --user clang-format==18.1.8
+          pip install --user --break-system-packages clang-format==18.1.8
           test -x ~/.local/bin/clang-format
           test -x /home/runner/.local/bin/clang-format
       - run: ./scripts/clang_format_check.sh /home/runner/.local/bin/clang-format .
 
   license_check:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: REUSE Compliance Check
-        uses: fsfe/reuse-action@v4
+        uses: fsfe/reuse-action@v5
 
   rust_format_check:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      - run: rustup default 1.77.2
       - run: rustup component add rustfmt
       - run: cargo fmt --all --check --verbose
 
   markdown_lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - uses: DavidAnson/markdownlint-cli2-action@v17
+      - uses: DavidAnson/markdownlint-cli2-action@v18
         with:
           globs: '**/*.md'
 
   shellcheck:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       # Shellcheck is likely already installed but lets ensure it is
@@ -66,14 +67,15 @@ jobs:
   coverage:
     # Run after pre checks
     needs: [ clang_format, license_check, rust_format_check, markdown_lint, shellcheck ]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Setup toolchain
         run: |
+          rustup default 1.77.2
           cargo install grcov
-          rustup component add llvm-tools
+          rustup component add llvm-tools rustfmt
       - name: build
         env:
           RUSTFLAGS: -Cinstrument-coverage
@@ -87,7 +89,7 @@ jobs:
       - name: generate-report
         run: grcov . -s . --binary-path ./target/debug/ -t lcov --branch --ignore-not-existing -o ./target/debug/lcov.info --excl-start CODECOV_EXCLUDE_START --excl-stop CODECOV_EXCLUDE_STOP
       - name: upload-report
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           directory: ./target/debug/
           files: lcov.info
@@ -96,9 +98,9 @@ jobs:
           verbose: true
 
   build-wasm:
-    name: Ubuntu 22.04 (wasm_32) Qt 6
+    name: Ubuntu 24.04 (wasm_32) Qt 6
     needs: [clang_format, license_check, rust_format_check, markdown_lint, shellcheck]
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     env:
       SCCACHE_CACHE_SIZE: 600M
     steps:
@@ -106,7 +108,8 @@ jobs:
         uses: actions/checkout@v4
       - name: Setup toolchain
         run: |
-          rustup component add clippy rustfmt
+          rustup default 1.77.2
+          rustup component add rustfmt
           rustup target add wasm32-unknown-emscripten
       - name: "Rust tools cache"
         uses: actions/cache@v4
@@ -116,13 +119,14 @@ jobs:
             ~/.cargo/bin/sccache
             ~/.cargo/bin/mdbook
             ~/.cargo/bin/mdbook-linkcheck
-          key: ubuntu-22.04_sccache-0.7.6_mdbook-0.4.36_mdbook-linkcheck-0.7.7
+          key: ubuntu-24.04_sccache-0.8.2_mdbook-0.4.36_mdbook-linkcheck-0.7.7
       - name: "Build Rust tools"
         if: steps.rust-tools-cache.outputs.cache-hit != 'true'
         # Do not build with storage backends enabled, we only need local
         run: |
-          cargo install --no-default-features sccache
-          cargo install mdbook mdbook-linkcheck
+          cargo install --no-default-features --version 0.8.2 sccache
+          cargo install --version 0.4.36 mdbook 
+          cargo install --version 0.7.7 mdbook-linkcheck
       # We want our compiler cache to always update to the newest state.
       # The best way for us to achieve this is to **always** update the cache after every landed commit.
       # That way it will closely follow our development.
@@ -137,13 +141,13 @@ jobs:
       #   with:
       #     update: true <------- THIS DOESN'T EXIST YET
       #     path: /home/runner/.cache/sccache
-      #     key: "Ubuntu 22.04 (wasm_32) Qt6_compiler_cache"
+      #     key: "Ubuntu 24.04 (wasm_32) Qt6_compiler_cache"
       - name: "Restore Compiler Cache"
         id: compiler-cache-restore
         uses: actions/cache/restore@v4
         with:
           path: /home/runner/.cache/sccache
-          key: "Ubuntu 22.04 (wasm_32) Qt6_compiler_cache"
+          key: "Ubuntu 24.04 (wasm_32) Qt6_compiler_cache"
       - name: "emsdk cache"
         uses: actions/cache@v4
         id: emsdk-cache
@@ -157,7 +161,11 @@ jobs:
           ./emsdk/emsdk install 2.0.14
           ./emsdk/emsdk activate 2.0.14
       - name: "Install Dependencies"
-        run: sudo apt-get update && sudo apt-get install -y ninja-build clang-format-12
+        run: | 
+          sudo apt-get update && sudo apt-get install -y ninja-build
+          pip install --user --break-system-packages clang-format==18.1.8
+          test -x ~/.local/bin/clang-format
+          test -x /home/runner/.local/bin/clang-format
       - name: Install Qt WASM & Desktop
         uses: jurplel/install-qt-action@v4
         with:
@@ -198,7 +206,6 @@ jobs:
         # Updating th cache doesn't work from forks
         # So update it once it's merged into the repo
         if: ${{ steps.compiler-cache-restore.outputs.cache-hit &&  github.event_name == 'push' }}
-        working-directory: /home/runner/cxx-qt
         continue-on-error: true
         run: |
           gh extension install actions/gh-actions-cache
@@ -212,7 +219,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: /home/runner/.cache/sccache
-          key: "Ubuntu 22.04 (wasm_32) Qt6_compiler_cache"
+          key: "Ubuntu 24.04 (wasm_32) Qt6_compiler_cache"
 
   build:
     # Run after pre checks
@@ -221,11 +228,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: Ubuntu 22.04 (gcc) Qt5
-            os: ubuntu-22.04
+          - name: Ubuntu 24.04 (gcc) Qt5
+            os: ubuntu-24.04
             qt_version: 5
-            vcpkg: off
-            vcpkg_triplet: x64-linux-release
+            aqt_version: '5.15.2'
+            aqt_arch: 'gcc_64'
+            aqt_host: 'linux'
             cores: 4
             # FIXME: valgrind complains about invalid debuginfo. Might be fixed when Ubuntu updates to valgrind 3.20
             # https://bugs.kde.org/show_bug.cgi?id=452758
@@ -234,19 +242,13 @@ jobs:
             compiler_cache_path: /home/runner/.cache/sccache
             clang_format_path: /home/runner/.local/bin/clang-format
             cargo_dir: ~/.cargo
-            packages-extra: >-
-                qtbase5-dev
-                qtdeclarative5-dev
-                qtquickcontrols2-5-dev
-                qml-module-qtquick2
-                qml-module-qtquick-controls2
-                qml-module-qttest
-            workspace: /home/runner/cxx-qt
-          - name: Ubuntu 22.04 (gcc) Qt6
-            os: ubuntu-22.04
+            rustc_wrapper: sccache
+          - name: Ubuntu 24.04 (gcc) Qt6
+            os: ubuntu-24.04
             qt_version: 6
-            vcpkg: off
-            vcpkg_triplet: x64-linux-release
+            aqt_version: '6.8.0'
+            aqt_arch: 'linux_gcc_64'
+            aqt_host: 'linux'
             cores: 4
             # FIXME: valgrind complains about invalid debuginfo. Might be fixed when Ubuntu updates to valgrind 3.20
             # https://bugs.kde.org/show_bug.cgi?id=452758
@@ -255,59 +257,61 @@ jobs:
             compiler_cache_path: /home/runner/.cache/sccache
             clang_format_path: /home/runner/.local/bin/clang-format
             cargo_dir: ~/.cargo
+            rustc_wrapper: sccache
             packages-extra: >-
-                qt6-base-dev
-                qt6-declarative-dev
-                qt6-declarative-dev-tools
-                qml6-module-qtquick-controls
-                qml6-module-qtquick-window
-                qml6-module-qttest
-                qml6-module-qtqml-workerscript
                 libgl1-mesa-dev
                 libvulkan-dev
                 libxkbcommon-dev
-            workspace: /home/runner/cxx-qt
 
-          - name: macOS 12 (clang) Qt5
-            os: macos-12
+          - name: macOS 13 (clang) Qt5
+            os: macos-13
             qt_version: 5
-            vcpkg: on
-            vcpkg_triplet: x64-osx-release
+            aqt_version: '5.15.2'
+            aqt_arch: 'clang_64'
+            aqt_host: 'mac'
+            dyld_framework_path: /Users/runner/work/cxx-qt/Qt/5.15.2/clang_64/lib
+            # https://doc.qt.io/qt-5/macos.html#target-platforms
+            macosx_deployment_target: '10.13'
             cores: 3
             # FIXME: qmltestrunner fails to import QtQuick module
             # https://github.com/KDAB/cxx-qt/issues/110
             ctest_args: --exclude-regex '^(cargo_clippy|cargo_doc|example_qml_features_test|example_qml_minimal_myobject_test|cargo_build_rerun|.*valgrind)$'
             qt_qpa_platform: cocoa
             compiler_cache_path: /Users/runner/Library/Caches/Mozilla.sccache
-            clang_format_path: /Users/runner/Library/Python/3.12/bin/clang-format
+            clang_format_path: /Users/runner/Library/Python/3.13/bin/clang-format
             cargo_dir: ~/.cargo
-            workspace: /Users/runner/cxx-qt
             cc: clang
             cxx: clang++
-          - name: macOS 12 (clang) Qt6
-            os: macos-12
+            # sccache is disabled due on macOS to https://github.com/mozilla/sccache/issues/2092
+            cmake_args: -DSCCACHE=OFF
+          - name: macOS 14 (clang) Qt6
+            os: macos-14
             qt_version: 6
-            vcpkg: on
-            vcpkg_triplet: x64-osx-release
+            aqt_version: '6.8.0'
+            aqt_arch: 'clang_64'
+            aqt_host: 'mac'
+            dyld_framework_path: /Users/runner/work/cxx-qt/Qt/6.8.0/macos/lib
+            # https://doc.qt.io/qt-6.7/macos.html#target-platforms
+            macosx_deployment_target: '13.0'
             cores: 3
             # FIXME: qmltestrunner fails to import QtQuick module
             # https://github.com/KDAB/cxx-qt/issues/110
             ctest_args: --exclude-regex '^(cargo_clippy|cargo_doc|example_qml_features_test|example_qml_minimal_myobject_test|cargo_build_rerun|.*valgrind)$'
             qt_qpa_platform: cocoa
             compiler_cache_path: /Users/runner/Library/Caches/Mozilla.sccache
-            clang_format_path: /Users/runner/Library/Python/3.12/bin/clang-format
+            clang_format_path: /Users/runner/Library/Python/3.13/bin/clang-format
             cargo_dir: ~/.cargo
-            workspace: /Users/runner/cxx-qt
             cc: clang
             cxx: clang++
+            # sccache is disabled on macOS due to https://github.com/mozilla/sccache/issues/2092
+            cmake_args: -DSCCACHE=OFF
 
           - name: Windows 2022 (MSVC) Qt5
             os: windows-2022
             qt_version: 5
-            vcpkg: on
-            # Use a short buildtrees root for building vcpkg
-            vcpkg_buildtrees_root: C:\v
-            vcpkg_triplet: x64-windows-release
+            aqt_version: '5.15.2'
+            aqt_arch: 'win64_msvc2019_64'
+            aqt_host: 'windows'
             cores: 4
             ctest_args: --exclude-regex '^(cargo_clippy|cargo_doc|cargo_build_rerun|.*valgrind)$'
             exe_suffix: .exe
@@ -317,15 +321,13 @@ jobs:
             cargo_dir: C:\Users\runneradmin\.cargo
             cc: cl
             cxx: cl
-            # The D drive runs out of space when building dependencies with vcpkg.
-            workspace: C:\cxx-qt
-          - name: Windows 2022 (MSVC) Qt6
+            rustc_wrapper: sccache
+          - name: Windows 2022 (MSVC2019) Qt6
             os: windows-2022
             qt_version: 6
-            vcpkg: on
-            # Use a short buildtrees root for building vcpkg
-            vcpkg_buildtrees_root: C:\v
-            vcpkg_triplet: x64-windows-release
+            aqt_version: '6.7.3'
+            aqt_arch: 'win64_msvc2019_64'
+            aqt_host: 'windows'
             cores: 4
             ctest_args: --exclude-regex '^(cargo_clippy|cargo_doc|cargo_build_rerun|.*valgrind)$'
             exe_suffix: .exe
@@ -335,15 +337,29 @@ jobs:
             cargo_dir: C:\Users\runneradmin\.cargo
             cc: cl
             cxx: cl
-            # The D drive runs out of space when building dependencies with vcpkg.
-            workspace: C:\cxx-qt
+            rustc_wrapper: sccache
+          - name: Windows 2022 (MSVC2022) Qt6
+            os: windows-2022
+            qt_version: 6
+            aqt_version: '6.8.0'
+            aqt_arch: 'win64_msvc2022_64'
+            aqt_host: 'windows'
+            cores: 4
+            ctest_args: --exclude-regex '^(cargo_clippy|cargo_doc|cargo_build_rerun|.*valgrind)$'
+            exe_suffix: .exe
+            qt_qpa_platform: windows
+            compiler_cache_path: C:\Users\runneradmin\AppData\Local\Mozilla\sccache\cache
+            clang_format_path: C:\Users\runneradmin\AppData\Roaming\Python\Python39\Scripts\clang-format.exe
+            cargo_dir: C:\Users\runneradmin\.cargo
+            cc: cl
+            cxx: cl
+            rustc_wrapper: sccache
 
     runs-on: ${{ matrix.os }}
     name: ${{ matrix.name }}
     env:
-        # Match the deployment target that Qt was built with via vcpkg, otherwise the following error occurs
         # ld: warning: object file (LIB) was built for newer macOS version (12.7) than being linked (12.0)
-        MACOSX_DEPLOYMENT_TARGET: 12.7
+        MACOSX_DEPLOYMENT_TARGET: ${{ matrix.macosx_deployment_target }}
         # sccache is around 180-300M in size for a normal build
         # With GitHub caches we have a 10 GB limit / 6 conditions = 1666 MB
         # Allow a larger cache size so that code in branches can be cached
@@ -351,19 +367,17 @@ jobs:
         SCCACHE_CACHE_SIZE: 600M
 
     steps:
-    # On Windows, the D drive that the workspace is on by default runs out of space when
-    # vcpkg builds Qt, so the repo needs to be cloned to the C drive. GitHub's checkout
-    # action does not support cloning to a path outside GITHUB_WORKSPACE:
-    # https://github.com/actions/checkout/issues/197
     - name: "Clone Git repository"
-      uses: LebedevRI/checkout@issue197
-      with:
-        path: ${{ matrix.workspace }}
+      uses: actions/checkout@v4
     # Ensure clippy and rustfmt is installed, they should come from github runner
+    # clippy version needs to be 1.78.0 for the MSRV lint
     #
     # Note we still need rustfmt for the cxx-qt-gen tests
     - name: "Install Rust toolchain"
-      run: rustup component add clippy rustfmt
+      run: |
+        rustup toolchain add 1.78.0 --component clippy
+        rustup default 1.77.2
+        rustup component add rustfmt
 
     - name: "Rust tools cache"
       uses: actions/cache@v4
@@ -373,13 +387,14 @@ jobs:
           ${{ matrix.cargo_dir }}/bin/sccache${{ matrix.exe_suffix }}
           ${{ matrix.cargo_dir }}/bin/mdbook${{ matrix.exe_suffix }}
           ${{ matrix.cargo_dir }}/bin/mdbook-linkcheck${{ matrix.exe_suffix }}
-        key: ${{ matrix.os }}_sccache-0.7.6_mdbook-0.4.36_mdbook-linkcheck-0.7.7
+        key: ${{ matrix.os }}_sccache-0.8.2_mdbook-0.4.36_mdbook-linkcheck-0.7.7
     - name: "Build Rust tools"
       if: steps.rust-tools-cache.outputs.cache-hit != 'true'
       # Do not build with storage backends enabled, we only need local
       run: |
-        cargo install --no-default-features sccache
-        cargo install mdbook mdbook-linkcheck
+        cargo install --no-default-features --version 0.8.2 sccache
+        cargo install --version 0.4.36 mdbook 
+        cargo install --version 0.7.7 mdbook-linkcheck
 
     # We want our compiler cache to always update to the newest state.
     # The best way for us to achieve this is to **always** update the cache after every landed commit.
@@ -406,8 +421,19 @@ jobs:
     - name: "Install clang-format"
       # Note ensure that clang-format runner is updated too
       run: |
-        pip install --user clang-format==18.1.8
+        pip install --user --break-system-packages clang-format==18.1.8
         test -x ${{ matrix.clang_format_path }}
+
+    # Version info found using https://ddalcino.github.io/aqt-list-server/
+    - name: "Install Qt"
+      uses: jurplel/install-qt-action@v4
+      with:
+        version: ${{ matrix.aqt_version }}
+        host: ${{ matrix.aqt_host }}
+        target: 'desktop'
+        arch: ${{ matrix.aqt_arch }}
+        tools: 'tools_cmake'
+        cache: true
 
     - name: "[Ubuntu] Install dependencies"
       if: runner.os == 'Linux'
@@ -430,59 +456,37 @@ jobs:
       # automake is needed for building libicu which is a dependency of Qt
       run: brew install automake autoconf-archive ninja
 
-    # Note that for nuget uploads to work this must be run as the kdab user
-    # eg a branch on the kdab repo rather than a users fork
-    #
-    # Otherwise you may see the following error:
-    # Pushing NuGet to "cxx-qt-github-packages" failed. Use --debug for more information.
-    - name: "Authenticate to GitHub Packages"
-      if: runner.os != 'Linux' && github.repository_owner == 'KDAB'
-      shell: bash
-      run: |
-        nuget sources add -Name cxx-qt-github-packages -Source https://nuget.pkg.github.com/KDAB/index.json -Username KDAB -Password ${{ secrets.GITHUB_TOKEN }} -NonInteractive
-        nuget setapikey ${{ secrets.GITHUB_TOKEN }} -Source cxx-qt-github-packages -NonInteractive
-        echo "VCPKG_BINARY_SOURCES=clear;nuget,cxx-qt-github-packages,readwrite;" >> "${GITHUB_ENV}"
-
     # Required for CMake to find Ninja
     - name: "[Windows] Set up MSVC Developer Command Prompt"
       if: runner.os == 'Windows'
       uses: seanmiddleditch/gha-setup-vsdevenv@v4
 
     # Ninja is required on Windows for CMAKE_CXX_COMPILER_LAUNCHER to work for using sccache.
-    #
-    # Until debug and release packages are split we only build release packages for vcpkg
-    # to improve CI run times, hence VCPKG_HOST_TRIPLET and VCPKG_TARGET_TRIPLET
-    # https://github.com/microsoft/vcpkg/issues/1626
     - name: "Configure"
       run: >-
-        cmake
+        cmake ${{ matrix.cmake_args }}
         -D USE_QT5=${{ matrix.qt_version == 5 }}
         -D CMAKE_BUILD_TYPE=Release
-        -D VCPKG=${{ matrix.vcpkg }}
-        -D VCPKG_HOST_TRIPLET=${{ matrix.vcpkg_triplet }}
-        -D VCPKG_BUILDTREES_ROOT=${{ matrix.vcpkg_buildtrees_root  }}
-        -D VCPKG_TARGET_TRIPLET=${{ matrix.vcpkg_triplet }}
         -G Ninja
         -S . -B build
-      working-directory: ${{ matrix.workspace }}
       env:
-        RUSTC_WRAPPER: sccache
+        RUSTC_WRAPPER: ${{ matrix.rustc_wrapper }}
         CC: ${{ matrix.cc }}
         CXX: ${{ matrix.cxx }}
     - name: "Build"
       run: cmake --build build --config Release --parallel ${{ matrix.cores }}
-      working-directory: ${{ matrix.workspace }}
       env:
-        RUSTC_WRAPPER: sccache
+        RUSTC_WRAPPER: ${{ matrix.rustc_wrapper }}
     - name: "Test"
       run: ctest ${{ matrix.ctest_args }} -C Release -T test --output-on-failure --parallel ${{ matrix.cores }}
-      working-directory: ${{ matrix.workspace }}/build
+      working-directory: ./build
       env:
         # Use the version of clang-format from pip
         CLANG_FORMAT_BINARY: ${{ matrix.clang_format_path }}
-        RUSTC_WRAPPER: sccache
+        RUSTC_WRAPPER: ${{ matrix.rustc_wrapper }}
         QT_QPA_PLATFORM: ${{ matrix.qt_qpa_platform }}
         QT_SELECT: qt${{ matrix.qt_version }}
+        DYLD_FRAMEWORK_PATH: ${{ matrix.dyld_framework_path }}
 
     - name: "Print compiler cache statistics"
       run: sccache --show-stats
@@ -494,7 +498,6 @@ jobs:
       # Updating th cache doesn't work from forks
       # So update it once it's merged into the repo
       if: ${{ steps.compiler-cache-restore.outputs.cache-hit &&  github.event_name == 'push' }}
-      working-directory: ${{ matrix.workspace }}
       continue-on-error: true
       run: |
         gh extension install actions/gh-actions-cache
@@ -509,15 +512,3 @@ jobs:
       with:
         path: ${{ matrix.compiler_cache_path }}
         key: ${{ matrix.name }}_compiler_cache
-
-    - name: Upload GitHub Actions artifacts of vcpkg logs
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: vcpkg-logs-${{ matrix.name }}
-        path: |
-          ${{ matrix.workspace }}/vcpkg/buildtrees/**/*.log
-          ${{ matrix.workspace }}/build/vcpkg-bootstrap.log
-          ${{ matrix.workspace }}/build/vcpkg-manifest-install.log
-          ${{ matrix.workspace }}/build/vcpkg_installed/vcpkg/issue_body.md
-        if-no-files-found: ignore

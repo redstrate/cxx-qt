@@ -11,6 +11,7 @@ use crate::{
 #[cfg(test)]
 use quote::format_ident;
 
+use crate::parser::CaseConversion;
 use syn::{Attribute, Error, Expr, Ident, Meta, Result};
 
 /// Metadata for registering QML element
@@ -78,8 +79,12 @@ impl ParsedQObject {
         declaration: ForeignTypeIdentAlias,
         namespace: Option<&str>,
         module: &Ident,
+        auto_case: CaseConversion,
     ) -> Result<Self> {
         let attributes = require_attributes(&declaration.attrs, &Self::ALLOWED_ATTRS)?;
+        // TODO: handle docs through to generation
+        //
+        // TODO: handle cfgs on qobject
         let has_qobject_macro = attributes.contains_key("qobject");
 
         let base_class = attributes
@@ -110,6 +115,7 @@ impl ParsedQObject {
             &declaration.attrs,
             namespace,
             Some(module),
+            CaseConversion::none(),
         )?;
 
         // Find any QML metadata
@@ -117,7 +123,7 @@ impl ParsedQObject {
 
         // Parse any properties in the type
         // and remove the #[qproperty] attribute
-        let properties = Self::parse_property_attributes(&declaration.attrs)?;
+        let properties = Self::parse_property_attributes(&declaration.attrs, auto_case)?;
         let inner = declaration.ident_right.clone();
 
         Ok(Self {
@@ -151,14 +157,17 @@ impl ParsedQObject {
         Ok(None)
     }
 
-    fn parse_property_attributes(attrs: &[Attribute]) -> Result<Vec<ParsedQProperty>> {
+    fn parse_property_attributes(
+        attrs: &[Attribute],
+        auto_case: CaseConversion,
+    ) -> Result<Vec<ParsedQProperty>> {
         // Once extract_if is stable, this would allow comparing all the elements using
         // path_compare_str and building ParsedQProperty from the extracted elements.
         // https://doc.rust-lang.org/nightly/std/vec/struct.Vec.html#method.extract_if
         attrs
             .iter()
             .filter(|attr| path_compare_str(attr.meta.path(), &["qproperty"]))
-            .map(ParsedQProperty::parse)
+            .map(|attr| ParsedQProperty::parse(attr, auto_case))
             .collect::<Result<Vec<_>>>()
     }
 }
@@ -178,7 +187,7 @@ pub mod tests {
                 let input = parse_quote! {
                     $($input)*
                 };
-                ParsedQObject::parse(input, None, &format_ident!("qobject")).unwrap()
+                ParsedQObject::parse(input, None, &format_ident!("qobject"), CaseConversion::none()).unwrap()
             }
        }
     }
@@ -296,7 +305,13 @@ pub mod tests {
             #[cxx_name = "RenamedObject"]
             type MyObject = super::MyObjectRust;
         };
-        let qobject = ParsedQObject::parse(item, None, &format_ident!("qobject")).unwrap();
+        let qobject = ParsedQObject::parse(
+            item,
+            None,
+            &format_ident!("qobject"),
+            CaseConversion::none(),
+        )
+        .unwrap();
         assert_qml_name(qobject, "RenamedObject");
     }
 
@@ -339,7 +354,7 @@ pub mod tests {
     #[test]
     fn test_parse_errors() {
         assert_parse_errors! {
-            |input |ParsedQObject::parse(input, None, &format_ident!("qobject")) =>
+            |input |ParsedQObject::parse(input, None, &format_ident!("qobject"), CaseConversion::none()) =>
 
             {
                 #[qobject]

@@ -29,18 +29,26 @@ mod qobject {
 
     // Note that we are only testing with C++ here so we don't need qinvokable
     unsafe extern "RustQt" {
+        #[cxx_name = "doubleNumberSelf"]
         fn double_number_self(self: Pin<&mut MyObject>);
 
+        #[cxx_name = "doubleNumber"]
         fn double_number(self: &MyObject, number: i32) -> i32;
 
+        #[cxx_name = "sayHi"]
         fn say_hi(self: &MyObject, string: &QString, number: i32);
 
+        #[cxx_name = "queueTest"]
         fn queue_test(self: Pin<&mut MyObject>);
 
+        #[cxx_name = "queueTestMultiThread"]
         fn queue_test_multi_thread(self: Pin<&mut MyObject>);
 
+        #[cxx_name = "fetchUpdateCallCount"]
         fn fetch_update_call_count(self: &MyObject) -> i32;
 
+        #[cfg(not(target_family = "wasm"))]
+        #[cxx_name = "throwException"]
         fn throw_exception(self: &MyObject) -> Result<i32>;
     }
 }
@@ -122,6 +130,7 @@ impl qobject::MyObject {
         self.update_call_count
     }
 
+    #[cfg(not(target_family = "wasm"))]
     fn throw_exception(&self) -> Result<i32, String> {
         Err("RustException".to_string())
     }

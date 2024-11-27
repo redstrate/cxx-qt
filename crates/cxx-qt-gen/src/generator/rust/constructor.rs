@@ -17,7 +17,6 @@ use crate::{
     syntax::lifetimes,
 };
 
-use convert_case::{Case, Casing};
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote};
 use syn::{
@@ -70,7 +69,7 @@ fn generate_default_constructor(
 
     let create_rs_ident = format_ident!(
         "create_rs_{object_name}",
-        object_name = rust_struct_ident.to_string().to_case(Case::Snake)
+        object_name = rust_struct_ident.to_string()
     );
     let namespace_internals = &namespace.internal;
 
@@ -84,6 +83,7 @@ fn generate_default_constructor(
         }],
         cxx_qt_mod_contents: vec![parse_quote! {
             #[doc(hidden)]
+            #[allow(clippy::unnecessary_box_returns)]
             pub fn #create_rs_ident() -> std::boxed::Box<#rust_struct_ident> {
                 // Wrapping the call to Default::default in a Box::new call leads
                 // to a nicer error message, as it's not trying to infer trait bounds
@@ -196,7 +196,6 @@ pub fn generate(
     let qobject_name = qobject_names.name.cxx_unqualified();
     let qobject_name_rust = qobject_names.name.rust_unqualified();
     let qobject_name_rust_qualified = type_names.rust_qualified(qobject_name_rust)?;
-    let qobject_name_snake = qobject_name.to_string().to_case(Case::Snake);
 
     let rust_struct_name_rust = qobject_names.rust_struct.rust_unqualified();
 
@@ -249,13 +248,13 @@ pub fn generate(
         let new_arguments_cxx = format_ident!("{NEW_ARGUMENTS}{index}");
         let initialize_arguments_cxx = format_ident!("{INITIALIZE_ARGUMENTS}{index}");
 
-        let new_rust = format_ident!("new_rs_{qobject_name_snake}_{index}");
+        let new_rust = format_ident!("new_rs_{qobject_name}_{index}");
         let new_cxx = format!("newRs{index}");
 
-        let initialize_rust = format_ident!("initialize_{qobject_name_snake}_{index}");
+        let initialize_rust = format_ident!("initialize_{qobject_name}_{index}");
         let initialize_cxx = format!("initialize{index}");
 
-        let route_arguments_rust = format_ident!("route_arguments_{qobject_name_snake}_{index}");
+        let route_arguments_rust = format_ident!("route_arguments_{qobject_name}_{index}");
         let route_arguments_cxx = format!("routeArguments{index}");
 
         let argument_types_qualified: Vec<Type> = constructor
@@ -407,6 +406,7 @@ pub fn generate(
             #[doc(hidden)]
             #[allow(unused_variables)]
             #[allow(clippy::extra_unused_lifetimes)]
+            #[allow(clippy::unnecessary_box_returns)]
             // If we use the lifetime here for casting to the specific Constructor type, then
             // clippy for some reason thinks that the lifetime is unused even though it is used
             // by the `as` expression.
@@ -484,8 +484,8 @@ mod tests {
             quote! {
                 extern "Rust" {
                     #[cxx_name="createRs"]
-                    #[namespace="qobject::cxx_qt_my_object"]
-                    fn create_rs_my_object_rust() -> Box<MyObjectRust>;
+                    #[namespace="qobject::cxx_qt_MyObject"]
+                    fn create_rs_MyObjectRust() -> Box<MyObjectRust>;
                 }
             },
         );
@@ -493,7 +493,8 @@ mod tests {
             &blocks.cxx_qt_mod_contents[0],
             quote! {
                 #[doc(hidden)]
-                pub fn create_rs_my_object_rust() -> std::boxed::Box<MyObjectRust>
+                #[allow(clippy::unnecessary_box_returns)]
+                pub fn create_rs_MyObjectRust() -> std::boxed::Box<MyObjectRust>
                 {
                     std::boxed::Box::new(core::default::Default::default())
                 }
@@ -510,7 +511,7 @@ mod tests {
         assert_tokens_eq(
             tokens,
             quote! {
-                #[namespace = "qobject::cxx_qt_my_object"]
+                #[namespace = "qobject::cxx_qt_MyObject"]
                 #[cxx_name = #cxx_name]
                 #[doc(hidden)]
                 struct #rust_name {
@@ -563,15 +564,15 @@ mod tests {
                 extern "Rust" {
                     #namespace_attr
                     #[cxx_name = "routeArguments0"]
-                    fn route_arguments_my_object_0() -> CxxQtConstructorArgumentsMyObject0;
+                    fn route_arguments_MyObject_0() -> CxxQtConstructorArgumentsMyObject0;
 
                     #namespace_attr
                     #[cxx_name = "newRs0"]
-                    fn new_rs_my_object_0(args: CxxQtConstructorNewArgumentsMyObject0) -> Box<MyObjectRust>;
+                    fn new_rs_MyObject_0(args: CxxQtConstructorNewArgumentsMyObject0) -> Box<MyObjectRust>;
 
                     #namespace_attr
                     #[cxx_name = "initialize0"]
-                    fn initialize_my_object_0(qobject: Pin<&mut MyObject>, args: CxxQtConstructorInitializeArgumentsMyObject0);
+                    fn initialize_MyObject_0(qobject: Pin<&mut MyObject>, args: CxxQtConstructorInitializeArgumentsMyObject0);
                 }
             },
         );
@@ -580,7 +581,7 @@ mod tests {
             &blocks.cxx_qt_mod_contents[0],
             quote! {
                 #[doc(hidden)]
-                pub fn route_arguments_my_object_0() -> qobject::CxxQtConstructorArgumentsMyObject0
+                pub fn route_arguments_MyObject_0() -> qobject::CxxQtConstructorArgumentsMyObject0
                 {
                     #[allow(unused_variables)]
                     #[allow(clippy::let_unit_value)]
@@ -601,7 +602,8 @@ mod tests {
                 #[doc(hidden)]
                 #[allow(unused_variables)]
                 #[allow(clippy::extra_unused_lifetimes)]
-                pub fn new_rs_my_object_0(new_arguments: qobject::CxxQtConstructorNewArgumentsMyObject0) -> std::boxed::Box<MyObjectRust> {
+                #[allow(clippy::unnecessary_box_returns)]
+                pub fn new_rs_MyObject_0(new_arguments: qobject::CxxQtConstructorNewArgumentsMyObject0) -> std::boxed::Box<MyObjectRust> {
                     std::boxed::Box::new(
                         <qobject::MyObject as cxx_qt::Constructor<()> >::new(())
                     )
@@ -614,7 +616,7 @@ mod tests {
                 #[doc(hidden)]
                 #[allow(unused_variables)]
                 #[allow(clippy::extra_unused_lifetimes)]
-                pub fn initialize_my_object_0(
+                pub fn initialize_MyObject_0(
                     qobject: core::pin::Pin<&mut qobject::MyObject>,
                     initialize_arguments: qobject::CxxQtConstructorInitializeArgumentsMyObject0)
                 {
@@ -687,15 +689,15 @@ mod tests {
                 extern "Rust" {
                     #namespace_attr
                     #[cxx_name = "routeArguments1"]
-                    unsafe fn route_arguments_my_object_1<'lifetime>(arg0: *const QObject) -> CxxQtConstructorArgumentsMyObject1<'lifetime>;
+                    unsafe fn route_arguments_MyObject_1<'lifetime>(arg0: *const QObject) -> CxxQtConstructorArgumentsMyObject1<'lifetime>;
 
                     #namespace_attr
                     #[cxx_name = "newRs1"]
-                    fn new_rs_my_object_1(args: CxxQtConstructorNewArgumentsMyObject1) -> Box<MyObjectRust>;
+                    fn new_rs_MyObject_1(args: CxxQtConstructorNewArgumentsMyObject1) -> Box<MyObjectRust>;
 
                     #namespace_attr
                     #[cxx_name = "initialize1"]
-                    unsafe fn initialize_my_object_1<'lifetime>(qobject: Pin<&mut MyObject>, args: CxxQtConstructorInitializeArgumentsMyObject1<'lifetime>);
+                    unsafe fn initialize_MyObject_1<'lifetime>(qobject: Pin<&mut MyObject>, args: CxxQtConstructorInitializeArgumentsMyObject1<'lifetime>);
                 }
             },
         );
@@ -704,7 +706,7 @@ mod tests {
             &blocks.cxx_qt_mod_contents[3],
             quote! {
                 #[doc(hidden)]
-                pub fn route_arguments_my_object_1<'lifetime>(arg0: *const QObject) -> qobject::CxxQtConstructorArgumentsMyObject1<'lifetime>
+                pub fn route_arguments_MyObject_1<'lifetime>(arg0: *const QObject) -> qobject::CxxQtConstructorArgumentsMyObject1<'lifetime>
                 {
                     #[allow(unused_variables)]
                     #[allow(clippy::let_unit_value)]
@@ -734,7 +736,8 @@ mod tests {
                 #[doc(hidden)]
                 #[allow(unused_variables)]
                 #[allow(clippy::extra_unused_lifetimes)]
-                pub fn new_rs_my_object_1(new_arguments: qobject::CxxQtConstructorNewArgumentsMyObject1) -> std::boxed::Box<MyObjectRust> {
+                #[allow(clippy::unnecessary_box_returns)]
+                pub fn new_rs_MyObject_1(new_arguments: qobject::CxxQtConstructorNewArgumentsMyObject1) -> std::boxed::Box<MyObjectRust> {
                     std::boxed::Box::new(
                         <qobject::MyObject as cxx_qt::Constructor<(*const QObject,)> >::new(
                             (new_arguments.arg0,)))
@@ -747,7 +750,7 @@ mod tests {
                 #[doc(hidden)]
                 #[allow(unused_variables)]
                 #[allow(clippy::extra_unused_lifetimes)]
-                pub fn initialize_my_object_1<'lifetime>(
+                pub fn initialize_MyObject_1<'lifetime>(
                     qobject: core::pin::Pin<&mut qobject::MyObject>,
                     initialize_arguments: qobject::CxxQtConstructorInitializeArgumentsMyObject1<'lifetime>)
                 {
@@ -784,7 +787,7 @@ mod tests {
         assert_eq!(blocks.cxx_qt_mod_contents.len(), 6);
 
         let namespace_attr = quote! {
-                #[namespace = "qobject::cxx_qt_my_object"]
+                #[namespace = "qobject::cxx_qt_MyObject"]
         };
 
         assert_empty_constructor_blocks(&blocks, &namespace_attr);

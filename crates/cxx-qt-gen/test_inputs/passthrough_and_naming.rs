@@ -116,7 +116,7 @@ pub mod ffi {
     extern "RustQt" {
         #[qobject]
         #[base = QStringListModel]
-        #[qproperty(i32, property_name)]
+        #[qproperty(i32, property_name, cxx_name = "propertyName")]
         type MyObject = super::MyObjectRust;
     }
 
@@ -131,16 +131,20 @@ pub mod ffi {
     extern "RustQt" {
         #[qobject]
         #[namespace = "second_object"]
-        #[qproperty(i32, property_name)]
+        #[qproperty(i32, property_name, cxx_name = "propertyName")]
         type SecondObject = super::SecondObjectRust;
     }
 
+    #[auto_cxx_name]
     unsafe extern "RustQt" {
         #[qsignal]
         fn ready(self: Pin<&mut SecondObject>);
 
         #[qinvokable]
         fn invokable_name(self: Pin<&mut SecondObject>);
+
+        #[cxx_name = "myRenamedFunction"]
+        fn my_function(self: &SecondObject);
     }
 
     extern "RustQt" {

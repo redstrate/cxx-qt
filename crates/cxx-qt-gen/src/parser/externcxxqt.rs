@@ -4,7 +4,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 use crate::{
-    parser::{externqobject::ParsedExternQObject, require_attributes, signals::ParsedSignal},
+    parser::{
+        externqobject::ParsedExternQObject, require_attributes, signals::ParsedSignal,
+        CaseConversion,
+    },
     syntax::{attribute::attribute_get_path, expr::expr_to_string, safety::Safety},
 };
 use syn::{spanned::Spanned, Error, ForeignItem, Ident, ItemForeignMod, Result, Token};
@@ -30,7 +33,13 @@ impl ParsedExternCxxQt {
         module_ident: &Ident,
         parent_namespace: Option<&str>,
     ) -> Result<Self> {
-        let attrs = require_attributes(&foreign_mod.attrs, &["namespace"])?;
+        // TODO: support cfg on foreign mod blocks
+        let attrs = require_attributes(
+            &foreign_mod.attrs,
+            &["namespace", "auto_cxx_name", "auto_rust_name"],
+        )?;
+
+        let auto_case = CaseConversion::from_attrs(&attrs)?;
 
         let namespace = attrs
             .get("namespace")
@@ -40,7 +49,7 @@ impl ParsedExternCxxQt {
             .transpose()?;
 
         let mut extern_cxx_block = ParsedExternCxxQt {
-            namespace: namespace.clone(),
+            namespace,
             unsafety: foreign_mod.unsafety,
             ..Default::default()
         };
@@ -57,7 +66,7 @@ impl ParsedExternCxxQt {
                 ForeignItem::Fn(foreign_fn) => {
                     // Test if the function is a signal
                     if attribute_get_path(&foreign_fn.attrs, &["qsignal"]).is_some() {
-                        let mut signal = ParsedSignal::parse(foreign_fn, safe_call)?;
+                        let mut signal = ParsedSignal::parse(foreign_fn, safe_call, auto_case)?;
                         // extern "C++Qt" signals are always inherit = true
                         // as they always exist on an existing QObject
                         signal.inherit = true;
@@ -70,6 +79,8 @@ impl ParsedExternCxxQt {
                 }
                 ForeignItem::Type(foreign_ty) => {
                     // Test that there is a #[qobject] attribute on any type
+                    //
+                    // TODO: what happens to any docs here?
                     if attribute_get_path(&foreign_ty.attrs, &["qobject"]).is_some() {
                         let extern_ty =
                             ParsedExternQObject::parse(foreign_ty, module_ident, parent_namespace)?;

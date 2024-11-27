@@ -2,9 +2,10 @@
 // SPDX-FileContributor: Andrew Hayzen <andrew.hayzen@kdab.com>
 //
 // SPDX-License-Identifier: MIT OR Apache-2.0
+use crate::parser::CaseConversion;
 use crate::{
     naming::Name,
-    parser::{check_safety, parameter::ParsedFunctionParameter, require_attributes},
+    parser::{check_safety, extract_cfgs, parameter::ParsedFunctionParameter, require_attributes},
     syntax::{foreignmod, safety::Safety, types},
 };
 use core::ops::Deref;
@@ -53,10 +54,12 @@ pub struct ParsedMethod {
     pub is_qinvokable: bool,
     // No docs field since the docs should be on the method implementation outside the bridge
     // This means any docs on the bridge declaration would be ignored
+    /// Cfgs for the method
+    pub cfgs: Vec<Attribute>,
 }
 
 impl ParsedMethod {
-    const ALLOWED_ATTRS: [&'static str; 7] = [
+    const ALLOWED_ATTRS: [&'static str; 8] = [
         "cxx_name",
         "rust_name",
         "qinvokable",
@@ -64,13 +67,14 @@ impl ParsedMethod {
         "cxx_override",
         "cxx_virtual",
         "doc",
+        "cfg",
     ];
 
     #[cfg(test)]
     pub fn mock_qinvokable(method: &ForeignItemFn) -> Self {
         Self {
             is_qinvokable: true,
-            ..Self::parse(method.clone(), Safety::Safe).unwrap()
+            ..Self::parse(method.clone(), Safety::Safe, CaseConversion::none()).unwrap()
         }
     }
 
@@ -101,10 +105,11 @@ impl ParsedMethod {
         Self { specifiers, ..self }
     }
 
-    pub fn parse(method: ForeignItemFn, safety: Safety) -> Result<Self> {
+    pub fn parse(method: ForeignItemFn, safety: Safety, auto_case: CaseConversion) -> Result<Self> {
         check_safety(&method, &safety)?;
-        let fields = MethodFields::parse(method)?;
+        let fields = MethodFields::parse(method, auto_case)?;
         let attrs = require_attributes(&fields.method.attrs, &Self::ALLOWED_ATTRS)?;
+        let cfgs = extract_cfgs(&fields.method.attrs);
 
         // Determine if the method is invokable
         let is_qinvokable = attrs.contains_key("qinvokable");
@@ -114,6 +119,7 @@ impl ParsedMethod {
             method_fields: fields,
             specifiers,
             is_qinvokable,
+            cfgs,
         })
     }
 }
@@ -139,14 +145,15 @@ pub struct MethodFields {
 }
 
 impl MethodFields {
-    pub fn parse(method: ForeignItemFn) -> Result<Self> {
+    pub fn parse(method: ForeignItemFn, auto_case: CaseConversion) -> Result<Self> {
         let self_receiver = foreignmod::self_type_from_foreign_fn(&method.sig)?;
         let (qobject_ident, mutability) = types::extract_qobject_ident(&self_receiver.ty)?;
         let mutable = mutability.is_some();
 
         let parameters = ParsedFunctionParameter::parse_all_ignoring_receiver(&method.sig)?;
         let safe = method.sig.unsafety.is_none();
-        let name = Name::from_rust_ident_and_attrs(&method.sig.ident, &method.attrs, None, None)?;
+        let name =
+            Name::from_ident_and_attrs(&method.sig.ident, &method.attrs, None, None, auto_case)?;
 
         Ok(MethodFields {
             method,

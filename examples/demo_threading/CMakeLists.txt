@@ -53,7 +53,10 @@ if(NOT CxxQt_FOUND)
 endif()
 
 set(CRATE cxx_qt_demo_threading)
-cxx_qt_import_crate(MANIFEST_PATH rust/Cargo.toml CRATES ${CRATE})
+cxx_qt_import_crate(
+    MANIFEST_PATH rust/Cargo.toml
+    CRATES ${CRATE}
+    QT_MODULES Qt::Core)
 cxx_qt_import_qml_module(${CRATE}_qml
     URI "com.kdab.energy"
     SOURCE_CRATE ${CRATE})
@@ -76,6 +79,11 @@ set(DEMO_THREADING_SOURCES
 )
 
 if(BUILD_WASM)
+    # Add -DRUST_CXX_NO_EXCEPTIONS to CXXFLAGS, as WASM does not support exceptions
+    set(EMSCRIPTEN_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+    list(APPEND EMSCRIPTEN_CXX_FLAGS "-DRUST_CXX_NO_EXCEPTIONS")
+    corrosion_set_env_vars(${CRATE} "CXXFLAGS=${EMSCRIPTEN_CXX_FLAGS}")
+
     # Currently need to use qt_add_executable
     # for WASM builds, otherwise there is no
     # HTML output.

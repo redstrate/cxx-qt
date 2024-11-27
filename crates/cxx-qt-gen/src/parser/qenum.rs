@@ -3,9 +3,10 @@
 //
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
+use crate::parser::{extract_cfgs, extract_docs, CaseConversion};
 use crate::{naming::Name, parser::require_attributes, syntax::path::path_compare_str};
 use quote::ToTokens;
-use syn::{Ident, ItemEnum, Result, Variant};
+use syn::{Attribute, Ident, ItemEnum, Result, Variant};
 
 pub struct ParsedQEnum {
     /// The name of the QObject
@@ -16,10 +17,15 @@ pub struct ParsedQEnum {
     pub qobject: Option<Ident>,
     /// The original enum item
     pub item: ItemEnum,
+    /// Docs from the qenum
+    pub docs: Vec<Attribute>,
+    /// Cfgs from the qenum
+    pub cfgs: Vec<Attribute>,
 }
 
 impl ParsedQEnum {
-    const ALLOWED_ATTRS: [&'static str; 5] = ["doc", "cxx_name", "rust_name", "namespace", "qenum"];
+    const ALLOWED_ATTRS: [&'static str; 6] =
+        ["cfg", "doc", "cxx_name", "rust_name", "namespace", "qenum"];
     fn parse_variant(variant: &Variant) -> Result<Ident> {
         fn err(spanned: &impl ToTokens, message: &str) -> Result<Ident> {
             Err(syn::Error::new_spanned(spanned, message))
@@ -55,6 +61,9 @@ impl ParsedQEnum {
         module: &Ident,
     ) -> Result<Self> {
         require_attributes(&qenum.attrs, &Self::ALLOWED_ATTRS)?;
+        let cfgs = extract_cfgs(&qenum.attrs);
+        let docs = extract_docs(&qenum.attrs);
+
         if qenum.variants.is_empty() {
             return Err(syn::Error::new_spanned(
                 qenum,
@@ -62,8 +71,13 @@ impl ParsedQEnum {
             ));
         }
 
-        let name =
-            Name::from_ident_and_attrs(&qenum.ident, &qenum.attrs, parent_namespace, Some(module))?;
+        let name = Name::from_ident_and_attrs(
+            &qenum.ident,
+            &qenum.attrs,
+            parent_namespace,
+            Some(module),
+            CaseConversion::none(),
+        )?;
 
         if name.namespace().is_none() && qobject.is_none() {
             return Err(syn::Error::new_spanned(
@@ -82,6 +96,8 @@ impl ParsedQEnum {
             name,
             qobject,
             variants,
+            docs,
+            cfgs,
             item: qenum,
         })
     }

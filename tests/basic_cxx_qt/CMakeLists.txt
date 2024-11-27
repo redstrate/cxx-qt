@@ -43,7 +43,14 @@ if(NOT CxxQt_FOUND)
 endif()
 
 set(CRATE basic_cxx_qt)
-cxx_qt_import_crate(MANIFEST_PATH rust/Cargo.toml CRATES ${CRATE})
+cxx_qt_import_crate(MANIFEST_PATH rust/Cargo.toml CRATES ${CRATE} QT_MODULES Qt::Core)
+
+if(BUILD_WASN)
+    # Add -DRUST_CXX_NO_EXCEPTIONS to CXXFLAGS, as WASM does not support exceptions
+    set(EMSCRIPTEN_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+    list(APPEND EMSCRIPTEN_CXX_FLAGS "-DRUST_CXX_NO_EXCEPTIONS")
+    corrosion_set_env_vars(${CRATE} "CXXFLAGS=${EMSCRIPTEN_CXX_FLAGS}")
+endif()
 
 add_executable(${APP_NAME} cpp/main.cpp)
 target_link_libraries(${APP_NAME} PRIVATE

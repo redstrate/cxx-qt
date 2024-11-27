@@ -62,15 +62,15 @@ pub fn generate_cpp_properties(
 pub mod tests {
     use super::*;
 
-    use crate::generator::naming::property::property_name_from_rust_name;
     use crate::generator::naming::qobject::tests::create_qobjectname;
     use crate::generator::structuring::Structures;
+    use crate::naming::Name;
     use crate::parser::property::{mock_property, QPropertyFlags};
     use crate::parser::qobject::ParsedQObject;
+    use crate::parser::CaseConversion;
     use crate::{CppFragment, Parser};
     use indoc::indoc;
     use pretty_assertions::assert_str_eq;
-    use quote::format_ident;
     use syn::{parse_quote, ItemMod, ItemStruct};
 
     pub fn require_pair(fragment: &CppFragment) -> core::result::Result<(String, String), String> {
@@ -95,7 +95,7 @@ pub mod tests {
     }
 
     fn setup_generated(input: &mut ItemStruct) -> Result<GeneratedCppQObjectBlocks> {
-        let property = ParsedQProperty::parse(&input.attrs.remove(0))?;
+        let property = ParsedQProperty::parse(&input.attrs.remove(0), CaseConversion::none())?;
 
         let properties = vec![property];
 
@@ -260,7 +260,7 @@ pub mod tests {
 
         assert_str_eq!(
             generated.metaobjects[0],
-            "Q_PROPERTY(::std::int32_t num READ getNum WRITE mySetter RESET myResetter)"
+            "Q_PROPERTY(::std::int32_t num READ getNum WRITE mySetter RESET my_resetter)"
         );
     }
 
@@ -281,12 +281,12 @@ pub mod tests {
     #[test]
     fn test_generate_cpp_properties() {
         let input1: ItemStruct = parse_quote! {
-            #[qproperty(i32, trivial_property, READ, WRITE, NOTIFY)]
+            #[qproperty(i32, trivial_property, cxx_name = "trivialProperty", READ, WRITE, NOTIFY)]
             struct MyStruct;
         };
 
         let input2: ItemStruct = parse_quote! {
-            #[qproperty(UniquePtr<QColor>, opaque_property)]
+            #[qproperty(UniquePtr<QColor>, opaque_property, cxx_name = "opaqueProperty",)]
             struct MyStruct;
         };
 
@@ -469,7 +469,7 @@ pub mod tests {
     #[test]
     fn test_generate_cpp_properties_mapped_cxx_name() {
         let properties = vec![ParsedQProperty {
-            name: property_name_from_rust_name(format_ident!("mapped_property")),
+            name: Name::mock_name_with_cxx("mapped_property", "mappedProperty"),
             ty: parse_quote! { A },
             flags: QPropertyFlags::default(),
         }];

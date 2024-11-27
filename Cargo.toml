@@ -27,20 +27,21 @@ resolver = "2"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/KDAB/cxx-qt/"
-version = "0.6.1"
+version = "0.7.0"
+rust-version = "1.77.2" # Clippy needs to >= 1.78.0 for a lint, but the package can be 1.77.2
 
 # Note a version needs to be specified on dependencies of packages
 # we publish, otherwise crates.io complains as it doesn't know the version.
 [workspace.dependencies]
-cxx-qt = { path = "crates/cxx-qt" }
-cxx-qt-macro = { path = "crates/cxx-qt-macro", version = "0.6.1" }
-cxx-qt-build = { path = "crates/cxx-qt-build", version = "0.6.1" }
-cxx-qt-gen = { path = "crates/cxx-qt-gen", version = "0.6.1" }
-cxx-qt-lib = { path = "crates/cxx-qt-lib", version = "0.6.1" }
-qt-build-utils = { path = "crates/qt-build-utils", version = "0.6.1" }
-cxx-qt-lib-extras = { path = "crates/cxx-qt-lib-extras", version = "0.6.1" }
+cxx-qt = { path = "crates/cxx-qt", version = "0.7.0" }
+cxx-qt-macro = { path = "crates/cxx-qt-macro", version = "0.7.0" }
+cxx-qt-build = { path = "crates/cxx-qt-build", version = "0.7.0" }
+cxx-qt-gen = { path = "crates/cxx-qt-gen", version = "0.7.0" }
+cxx-qt-lib = { path = "crates/cxx-qt-lib", version = "0.7.0" }
+qt-build-utils = { path = "crates/qt-build-utils", version = "0.7.0" }
+cxx-qt-lib-extras = { path = "crates/cxx-qt-lib-extras", version = "0.7.0" }
 
-cc = { version = "1.0.89", features = ["parallel"] }
+cc = { version = "1.0.100", features = ["parallel"] }
 # Ensure that the example comments are kept in sync
 # ./examples/cargo_without_cmake/Cargo.toml
 # ./examples/qml_minimal/rust/Cargo.toml
@@ -50,9 +51,12 @@ cc = { version = "1.0.89", features = ["parallel"] }
 cxx = "1.0.95"
 cxx-build = { version = "1.0.95", features = [ "parallel" ] }
 cxx-gen = "0.7.121"
-convert_case = "0.6"
 proc-macro2 = "1.0"
 syn = { version = "2.0", features = ["extra-traits", "full"] }
 quote = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+thiserror = "1.0"
+
+[workspace.lints.clippy]
+incompatible_msrv = "deny"

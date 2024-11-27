@@ -6,9 +6,8 @@ use crate::{
     naming::Name,
     parser::property::{FlagState, ParsedQProperty},
 };
-use convert_case::{Case, Casing};
 use quote::format_ident;
-use syn::{Ident, Result};
+use syn::Result;
 
 use crate::generator::structuring::StructuredQObject;
 use core::ops::Deref;
@@ -117,30 +116,26 @@ impl QPropertyNames {
     }
 }
 
-pub fn property_name_from_rust_name(ident: Ident) -> Name {
-    // TODO: ParsedQProperty should probably take care of this already and allow the user to set
-    // their own name for C++ if they want to.
-    // REMOVE THIS FN
-    let cxx_name = ident.to_string().to_case(Case::Camel);
-    Name::new(ident).with_cxx_name(cxx_name)
+fn capitalise_first(str: String) -> String {
+    let mut out = "".to_string();
+    if let Some(first) = str.chars().next() {
+        out.push(first.to_ascii_uppercase());
+        out.push_str(&str[1..]);
+    }
+    out
 }
 
 /// For a given property name generate the getter name
 fn getter_name_from_property(name: &Name) -> Name {
-    name.clone().with_cxx_name(format!(
-        "get{}",
-        name.cxx_unqualified().to_case(Case::Pascal)
-    ))
+    name.clone()
+        .with_cxx_name(format!("get{}", capitalise_first(name.cxx_unqualified())))
 }
 
 /// For a given property name generate the setter name
 fn setter_name_from_property(name: &Name) -> Name {
     name.clone()
         .with_rust_name(format_ident!("set_{}", name.rust_unqualified()))
-        .with_cxx_name(format!(
-            "set{}",
-            name.cxx_unqualified().to_case(Case::Pascal)
-        ))
+        .with_cxx_name(format!("set{}", capitalise_first(name.cxx_unqualified())))
 }
 
 /// For a given property name generate the notify signal name
@@ -160,7 +155,7 @@ pub mod tests {
 
     pub fn create_i32_qpropertyname() -> QPropertyNames {
         let property = ParsedQProperty {
-            name: property_name_from_rust_name(format_ident!("my_property")),
+            name: Name::mock_name_with_cxx("my_property", "myProperty"),
             ty: parse_quote! { i32 },
             flags: QPropertyFlags::default(),
         };
@@ -195,5 +190,12 @@ pub mod tests {
             names.notify.as_ref().unwrap().rust_unqualified(),
             "my_property_changed"
         );
+    }
+
+    #[test]
+    fn test_capitalise_first() {
+        assert_eq!(capitalise_first("abc".to_owned()), "Abc".to_owned());
+        assert_eq!(capitalise_first("".to_string()), "".to_owned());
+        assert_eq!(capitalise_first("a".to_owned()), "A".to_owned());
     }
 }

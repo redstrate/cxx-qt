@@ -1,4 +1,5 @@
 #[cxx::bridge(namespace = "cxx_qt::my_object")]
+#[allow(unused_unsafe)]
 mod ffi {
     #[namespace = ""]
     unsafe extern "C++" {
@@ -44,7 +45,7 @@ mod ffi {
         type MyObjectRust;
     }
     extern "Rust" {
-        #[cxx_name = "cppMethod"]
+        #[cxx_name = "cpp_method"]
         #[namespace = "cxx_qt::my_object"]
         #[doc(hidden)]
         fn cpp_method(self: &MyObject);
@@ -56,97 +57,96 @@ mod ffi {
         fn invokable(self: &MyObject);
     }
     extern "Rust" {
-        #[cxx_name = "invokableMutable"]
+        #[cxx_name = "invokable_mutable"]
         #[namespace = "cxx_qt::my_object"]
         #[doc(hidden)]
         fn invokable_mutable(self: Pin<&mut MyObject>);
     }
     extern "Rust" {
-        #[cxx_name = "invokableParameters"]
+        #[cxx_name = "invokable_parameters"]
         #[namespace = "cxx_qt::my_object"]
         #[doc(hidden)]
         fn invokable_parameters(self: &MyObject, opaque: &QColor, trivial: &QPoint, primitive: i32);
     }
     extern "Rust" {
-        #[cxx_name = "invokableReturnOpaque"]
+        #[cxx_name = "invokable_return_opaque"]
         #[namespace = "cxx_qt::my_object"]
         #[doc(hidden)]
         fn invokable_return_opaque(self: Pin<&mut MyObject>) -> UniquePtr<Opaque>;
     }
     extern "Rust" {
-        #[cxx_name = "invokableReturnTrivial"]
+        #[cxx_name = "invokable_return_trivial"]
         #[namespace = "cxx_qt::my_object"]
         #[doc(hidden)]
         fn invokable_return_trivial(self: Pin<&mut MyObject>) -> QPoint;
     }
     extern "Rust" {
-        #[cxx_name = "invokableFinal"]
+        #[cxx_name = "invokable_final"]
         #[namespace = "cxx_qt::my_object"]
         #[doc(hidden)]
         fn invokable_final(self: &MyObject);
     }
     extern "Rust" {
-        #[cxx_name = "invokableOverride"]
+        #[cxx_name = "invokable_override"]
         #[namespace = "cxx_qt::my_object"]
         #[doc(hidden)]
         fn invokable_override(self: &MyObject);
     }
     extern "Rust" {
-        #[cxx_name = "invokableVirtual"]
+        #[cxx_name = "invokable_virtual"]
         #[namespace = "cxx_qt::my_object"]
         #[doc(hidden)]
         fn invokable_virtual(self: &MyObject);
     }
     extern "Rust" {
-        #[cxx_name = "invokableResultTuple"]
+        #[cxx_name = "invokable_result_tuple"]
         #[namespace = "cxx_qt::my_object"]
         #[doc(hidden)]
         fn invokable_result_tuple(self: &MyObject) -> Result<()>;
     }
     extern "Rust" {
-        #[cxx_name = "invokableResultType"]
+        #[cxx_name = "invokable_result_type"]
         #[namespace = "cxx_qt::my_object"]
         #[doc(hidden)]
         fn invokable_result_type(self: &MyObject) -> Result<String>;
     }
     unsafe extern "C++" {
         #[doc(hidden)]
+        #[namespace = "cxx_qt::my_object"]
         type MyObjectCxxQtThread = cxx_qt::CxxQtThread<MyObject>;
         include!("cxx-qt/thread.h");
         #[doc(hidden)]
         #[cxx_name = "qtThread"]
         #[namespace = "rust::cxxqt1"]
-        fn cxx_qt_ffi_my_object_qt_thread(qobject: &MyObject) -> MyObjectCxxQtThread;
+        fn cxx_qt_ffi_MyObject_qtThread(qobject: &MyObject) -> MyObjectCxxQtThread;
         #[doc(hidden)]
         #[cxx_name = "cxxQtThreadQueue"]
         #[namespace = "rust::cxxqt1"]
-        fn cxx_qt_ffi_my_object_cxx_qt_thread_queue(
+        fn cxx_qt_ffi_MyObject_cxxQtThreadQueue(
             cxx_qt_thread: &MyObjectCxxQtThread,
             func: fn(Pin<&mut MyObject>, Box<MyObjectCxxQtThreadQueuedFn>),
             arg: Box<MyObjectCxxQtThreadQueuedFn>,
-        ) -> Result<()>;
+        ) -> u8;
         #[doc(hidden)]
         #[cxx_name = "cxxQtThreadClone"]
         #[namespace = "rust::cxxqt1"]
-        fn cxx_qt_ffi_my_object_cxx_qt_thread_clone(
+        fn cxx_qt_ffi_MyObject_cxxQtThreadClone(
             cxx_qt_thread: &MyObjectCxxQtThread,
         ) -> MyObjectCxxQtThread;
         #[doc(hidden)]
         #[cxx_name = "cxxQtThreadDrop"]
         #[namespace = "rust::cxxqt1"]
-        fn cxx_qt_ffi_my_object_cxx_qt_thread_drop(cxx_qt_thread: &mut MyObjectCxxQtThread);
+        fn cxx_qt_ffi_MyObject_cxxQtThreadDrop(cxx_qt_thread: &mut MyObjectCxxQtThread);
         #[doc(hidden)]
         #[cxx_name = "cxxQtThreadIsDestroyed"]
         #[namespace = "rust::cxxqt1"]
-        fn cxx_qt_ffi_my_object_cxx_qt_thread_is_destroyed(
-            cxx_qt_thread: &MyObjectCxxQtThread,
-        ) -> bool;
+        fn cxx_qt_ffi_MyObject_cxxQtThreadIsDestroyed(cxx_qt_thread: &MyObjectCxxQtThread) -> bool;
     }
     extern "Rust" {
-        #[namespace = "cxx_qt::my_object::cxx_qt_my_object"]
+        #[namespace = "cxx_qt::my_object::cxx_qt_MyObject"]
         type MyObjectCxxQtThreadQueuedFn;
     }
-    #[namespace = "cxx_qt::my_object::cxx_qt_my_object"]
+    #[namespace = "cxx_qt::my_object::cxx_qt_MyObject"]
     #[cxx_name = "CxxQtConstructorArguments0"]
     #[doc(hidden)]
     struct CxxQtConstructorArgumentsMyObject0<'a> {
@@ -155,19 +155,19 @@ mod ffi {
         new: CxxQtConstructorNewArgumentsMyObject0<'a>,
         initialize: CxxQtConstructorInitializeArgumentsMyObject0,
     }
-    #[namespace = "cxx_qt::my_object::cxx_qt_my_object"]
+    #[namespace = "cxx_qt::my_object::cxx_qt_MyObject"]
     #[cxx_name = "CxxQtConstructorBaseArguments0"]
     #[doc(hidden)]
     struct CxxQtConstructorBaseArgumentsMyObject0 {
         arg0: *mut QObject,
     }
-    #[namespace = "cxx_qt::my_object::cxx_qt_my_object"]
+    #[namespace = "cxx_qt::my_object::cxx_qt_MyObject"]
     #[cxx_name = "CxxQtConstructorNewArguments0"]
     #[doc(hidden)]
     struct CxxQtConstructorNewArgumentsMyObject0<'a> {
         arg0: &'a QString,
     }
-    #[namespace = "cxx_qt::my_object::cxx_qt_my_object"]
+    #[namespace = "cxx_qt::my_object::cxx_qt_MyObject"]
     #[cxx_name = "CxxQtConstructorInitializeArguments0"]
     #[doc(hidden)]
     struct CxxQtConstructorInitializeArgumentsMyObject0 {
@@ -175,25 +175,25 @@ mod ffi {
     }
     #[allow(clippy::needless_lifetimes)]
     extern "Rust" {
-        #[namespace = "cxx_qt::my_object::cxx_qt_my_object"]
+        #[namespace = "cxx_qt::my_object::cxx_qt_MyObject"]
         #[cxx_name = "routeArguments0"]
-        unsafe fn route_arguments_my_object_0<'a>(
+        unsafe fn route_arguments_MyObject_0<'a>(
             arg0: i32,
             arg1: &'a QString,
         ) -> CxxQtConstructorArgumentsMyObject0<'a>;
-        #[namespace = "cxx_qt::my_object::cxx_qt_my_object"]
+        #[namespace = "cxx_qt::my_object::cxx_qt_MyObject"]
         #[cxx_name = "newRs0"]
-        unsafe fn new_rs_my_object_0<'a>(
+        unsafe fn new_rs_MyObject_0<'a>(
             args: CxxQtConstructorNewArgumentsMyObject0<'a>,
         ) -> Box<MyObjectRust>;
-        #[namespace = "cxx_qt::my_object::cxx_qt_my_object"]
+        #[namespace = "cxx_qt::my_object::cxx_qt_MyObject"]
         #[cxx_name = "initialize0"]
-        unsafe fn initialize_my_object_0(
+        unsafe fn initialize_MyObject_0(
             qobject: Pin<&mut MyObject>,
             args: CxxQtConstructorInitializeArgumentsMyObject0,
         );
     }
-    #[namespace = "cxx_qt::my_object::cxx_qt_my_object"]
+    #[namespace = "cxx_qt::my_object::cxx_qt_MyObject"]
     #[cxx_name = "CxxQtConstructorArguments1"]
     #[doc(hidden)]
     struct CxxQtConstructorArgumentsMyObject1 {
@@ -202,19 +202,19 @@ mod ffi {
         new: CxxQtConstructorNewArgumentsMyObject1,
         initialize: CxxQtConstructorInitializeArgumentsMyObject1,
     }
-    #[namespace = "cxx_qt::my_object::cxx_qt_my_object"]
+    #[namespace = "cxx_qt::my_object::cxx_qt_MyObject"]
     #[cxx_name = "CxxQtConstructorBaseArguments1"]
     #[doc(hidden)]
     struct CxxQtConstructorBaseArgumentsMyObject1 {
         not_empty: i8,
     }
-    #[namespace = "cxx_qt::my_object::cxx_qt_my_object"]
+    #[namespace = "cxx_qt::my_object::cxx_qt_MyObject"]
     #[cxx_name = "CxxQtConstructorNewArguments1"]
     #[doc(hidden)]
     struct CxxQtConstructorNewArgumentsMyObject1 {
         not_empty: i8,
     }
-    #[namespace = "cxx_qt::my_object::cxx_qt_my_object"]
+    #[namespace = "cxx_qt::my_object::cxx_qt_MyObject"]
     #[cxx_name = "CxxQtConstructorInitializeArguments1"]
     #[doc(hidden)]
     struct CxxQtConstructorInitializeArgumentsMyObject1 {
@@ -222,15 +222,15 @@ mod ffi {
     }
     #[allow(clippy::needless_lifetimes)]
     extern "Rust" {
-        #[namespace = "cxx_qt::my_object::cxx_qt_my_object"]
+        #[namespace = "cxx_qt::my_object::cxx_qt_MyObject"]
         #[cxx_name = "routeArguments1"]
-        fn route_arguments_my_object_1() -> CxxQtConstructorArgumentsMyObject1;
-        #[namespace = "cxx_qt::my_object::cxx_qt_my_object"]
+        fn route_arguments_MyObject_1() -> CxxQtConstructorArgumentsMyObject1;
+        #[namespace = "cxx_qt::my_object::cxx_qt_MyObject"]
         #[cxx_name = "newRs1"]
-        fn new_rs_my_object_1(args: CxxQtConstructorNewArgumentsMyObject1) -> Box<MyObjectRust>;
-        #[namespace = "cxx_qt::my_object::cxx_qt_my_object"]
+        fn new_rs_MyObject_1(args: CxxQtConstructorNewArgumentsMyObject1) -> Box<MyObjectRust>;
+        #[namespace = "cxx_qt::my_object::cxx_qt_MyObject"]
         #[cxx_name = "initialize1"]
-        fn initialize_my_object_1(
+        fn initialize_MyObject_1(
             qobject: Pin<&mut MyObject>,
             args: CxxQtConstructorInitializeArgumentsMyObject1,
         );
@@ -239,32 +239,30 @@ mod ffi {
         #[doc(hidden)]
         #[cxx_name = "unsafeRust"]
         #[namespace = "rust::cxxqt1"]
-        fn cxx_qt_ffi_my_object_unsafe_rust(outer: &MyObject) -> &MyObjectRust;
+        fn cxx_qt_ffi_MyObject_unsafeRust(outer: &MyObject) -> &MyObjectRust;
     }
     unsafe extern "C++" {
         #[doc(hidden)]
         #[cxx_name = "unsafeRustMut"]
         #[namespace = "rust::cxxqt1"]
-        fn cxx_qt_ffi_my_object_unsafe_rust_mut(
-            outer: Pin<&mut MyObject>,
-        ) -> Pin<&mut MyObjectRust>;
+        fn cxx_qt_ffi_MyObject_unsafeRustMut(outer: Pin<&mut MyObject>) -> Pin<&mut MyObjectRust>;
     }
 }
 impl cxx_qt::Threading for ffi::MyObject {
     type BoxedQueuedFn = MyObjectCxxQtThreadQueuedFn;
     type ThreadingTypeId = cxx::type_id!("cxx_qt::my_object::MyObjectCxxQtThread");
     fn qt_thread(&self) -> ffi::MyObjectCxxQtThread {
-        ffi::cxx_qt_ffi_my_object_qt_thread(self)
+        ffi::cxx_qt_ffi_MyObject_qtThread(self)
     }
     #[doc(hidden)]
     fn is_destroyed(cxx_qt_thread: &ffi::MyObjectCxxQtThread) -> bool {
-        ffi::cxx_qt_ffi_my_object_cxx_qt_thread_is_destroyed(cxx_qt_thread)
+        ffi::cxx_qt_ffi_MyObject_cxxQtThreadIsDestroyed(cxx_qt_thread)
     }
     #[doc(hidden)]
     fn queue<F>(
         cxx_qt_thread: &ffi::MyObjectCxxQtThread,
         f: F,
-    ) -> std::result::Result<(), cxx::Exception>
+    ) -> std::result::Result<(), cxx_qt::ThreadingQueueError>
     where
         F: FnOnce(core::pin::Pin<&mut ffi::MyObject>),
         F: Send + 'static,
@@ -280,19 +278,22 @@ impl cxx_qt::Threading for ffi::MyObject {
         let arg = MyObjectCxxQtThreadQueuedFn {
             inner: std::boxed::Box::new(f),
         };
-        ffi::cxx_qt_ffi_my_object_cxx_qt_thread_queue(
+        match ffi::cxx_qt_ffi_MyObject_cxxQtThreadQueue(
             cxx_qt_thread,
             func,
             std::boxed::Box::new(arg),
-        )
+        ) {
+            0 => Ok(()),
+            others => Err(others.into()),
+        }
     }
     #[doc(hidden)]
     fn threading_clone(cxx_qt_thread: &ffi::MyObjectCxxQtThread) -> ffi::MyObjectCxxQtThread {
-        ffi::cxx_qt_ffi_my_object_cxx_qt_thread_clone(cxx_qt_thread)
+        ffi::cxx_qt_ffi_MyObject_cxxQtThreadClone(cxx_qt_thread)
     }
     #[doc(hidden)]
     fn threading_drop(cxx_qt_thread: &mut ffi::MyObjectCxxQtThread) {
-        ffi::cxx_qt_ffi_my_object_cxx_qt_thread_drop(cxx_qt_thread);
+        ffi::cxx_qt_ffi_MyObject_cxxQtThreadDrop(cxx_qt_thread);
     }
 }
 #[doc(hidden)]
@@ -300,7 +301,7 @@ pub struct MyObjectCxxQtThreadQueuedFn {
     inner: std::boxed::Box<dyn FnOnce(core::pin::Pin<&mut ffi::MyObject>) + Send>,
 }
 #[doc(hidden)]
-pub fn route_arguments_my_object_0<'a>(
+pub fn route_arguments_MyObject_0<'a>(
     arg0: i32,
     arg1: &'a ffi::QString,
 ) -> ffi::CxxQtConstructorArgumentsMyObject0<'a> {
@@ -323,7 +324,8 @@ pub fn route_arguments_my_object_0<'a>(
 #[doc(hidden)]
 #[allow(unused_variables)]
 #[allow(clippy::extra_unused_lifetimes)]
-pub fn new_rs_my_object_0<'a>(
+#[allow(clippy::unnecessary_box_returns)]
+pub fn new_rs_MyObject_0<'a>(
     new_arguments: ffi::CxxQtConstructorNewArgumentsMyObject0<'a>,
 ) -> std::boxed::Box<MyObjectRust> {
     std::boxed::Box::new(<ffi::MyObject as cxx_qt::Constructor<(
@@ -334,14 +336,14 @@ pub fn new_rs_my_object_0<'a>(
 #[doc(hidden)]
 #[allow(unused_variables)]
 #[allow(clippy::extra_unused_lifetimes)]
-pub fn initialize_my_object_0<'a>(
+pub fn initialize_MyObject_0<'a>(
     qobject: core::pin::Pin<&mut ffi::MyObject>,
     initialize_arguments: ffi::CxxQtConstructorInitializeArgumentsMyObject0,
 ) {
     <ffi::MyObject as cxx_qt::Constructor<(i32, &'a ffi::QString)>>::initialize(qobject, ());
 }
 #[doc(hidden)]
-pub fn route_arguments_my_object_1() -> ffi::CxxQtConstructorArgumentsMyObject1 {
+pub fn route_arguments_MyObject_1() -> ffi::CxxQtConstructorArgumentsMyObject1 {
     #[allow(unused_variables)]
     #[allow(clippy::let_unit_value)]
     let (new_arguments, base_arguments, initialize_arguments) =
@@ -355,7 +357,8 @@ pub fn route_arguments_my_object_1() -> ffi::CxxQtConstructorArgumentsMyObject1 
 #[doc(hidden)]
 #[allow(unused_variables)]
 #[allow(clippy::extra_unused_lifetimes)]
-pub fn new_rs_my_object_1(
+#[allow(clippy::unnecessary_box_returns)]
+pub fn new_rs_MyObject_1(
     new_arguments: ffi::CxxQtConstructorNewArgumentsMyObject1,
 ) -> std::boxed::Box<MyObjectRust> {
     std::boxed::Box::new(<ffi::MyObject as cxx_qt::Constructor<()>>::new(()))
@@ -363,7 +366,7 @@ pub fn new_rs_my_object_1(
 #[doc(hidden)]
 #[allow(unused_variables)]
 #[allow(clippy::extra_unused_lifetimes)]
-pub fn initialize_my_object_1(
+pub fn initialize_MyObject_1(
     qobject: core::pin::Pin<&mut ffi::MyObject>,
     initialize_arguments: ffi::CxxQtConstructorInitializeArgumentsMyObject1,
 ) {
@@ -372,15 +375,15 @@ pub fn initialize_my_object_1(
 impl ::core::ops::Deref for ffi::MyObject {
     type Target = MyObjectRust;
     fn deref(&self) -> &Self::Target {
-        ffi::cxx_qt_ffi_my_object_unsafe_rust(self)
+        ffi::cxx_qt_ffi_MyObject_unsafeRust(self)
     }
 }
 impl ::cxx_qt::CxxQtType for ffi::MyObject {
     type Rust = MyObjectRust;
     fn rust(&self) -> &Self::Rust {
-        ffi::cxx_qt_ffi_my_object_unsafe_rust(self)
+        ffi::cxx_qt_ffi_MyObject_unsafeRust(self)
     }
     fn rust_mut(self: core::pin::Pin<&mut Self>) -> core::pin::Pin<&mut Self::Rust> {
-        ffi::cxx_qt_ffi_my_object_unsafe_rust_mut(self)
+        ffi::cxx_qt_ffi_MyObject_unsafeRustMut(self)
     }
 }

@@ -1,4 +1,5 @@
 #[cxx::bridge(namespace = "")]
+#[allow(unused_unsafe)]
 mod inheritance {
     extern "C++" {
         include!("cxx-qt-lib/qmodelindex.h");
@@ -42,7 +43,7 @@ mod inheritance {
         fn data(self: &MyObject, _index: &QModelIndex, _role: i32) -> QVariant;
     }
     extern "Rust" {
-        #[cxx_name = "hasChildren"]
+        #[cxx_name = "has_children"]
         #[doc(hidden)]
         fn has_children(self: &MyObject, _parent: &QModelIndex) -> bool;
     }
@@ -56,28 +57,26 @@ mod inheritance {
         fn hello_world(self: &MyObject, parent: &QModelIndex) -> bool;
     }
     extern "C++" {
-        #[cxx_name = "fetchMoreCxxQtInherit"]
+        #[cxx_name = "fetch_moreCxxQtInherit"]
         #[doc = " Inherited fetchMore from the base class"]
         unsafe fn fetch_more(self: Pin<&mut MyObject>, index: &QModelIndex);
     }
     extern "Rust" {
         #[cxx_name = "createRs"]
-        #[namespace = "cxx_qt_my_object"]
-        fn create_rs_my_object_rust() -> Box<MyObjectRust>;
+        #[namespace = "cxx_qt_MyObject"]
+        fn create_rs_MyObjectRust() -> Box<MyObjectRust>;
     }
     unsafe extern "C++" {
         #[doc(hidden)]
         #[cxx_name = "unsafeRust"]
         #[namespace = "rust::cxxqt1"]
-        fn cxx_qt_ffi_my_object_unsafe_rust(outer: &MyObject) -> &MyObjectRust;
+        fn cxx_qt_ffi_MyObject_unsafeRust(outer: &MyObject) -> &MyObjectRust;
     }
     unsafe extern "C++" {
         #[doc(hidden)]
         #[cxx_name = "unsafeRustMut"]
         #[namespace = "rust::cxxqt1"]
-        fn cxx_qt_ffi_my_object_unsafe_rust_mut(
-            outer: Pin<&mut MyObject>,
-        ) -> Pin<&mut MyObjectRust>;
+        fn cxx_qt_ffi_MyObject_unsafeRustMut(outer: Pin<&mut MyObject>) -> Pin<&mut MyObjectRust>;
     }
 }
 impl cxx_qt::Upcast<inheritance::QAbstractItemModel> for inheritance::MyObject {}
@@ -85,21 +84,22 @@ impl cxx_qt::Upcast<inheritance::QAbstractItemModel> for inheritance::MyObject {
 #[allow(dead_code)]
 use inheritance::QAbstractItemModel as _;
 #[doc(hidden)]
-pub fn create_rs_my_object_rust() -> std::boxed::Box<MyObjectRust> {
+#[allow(clippy::unnecessary_box_returns)]
+pub fn create_rs_MyObjectRust() -> std::boxed::Box<MyObjectRust> {
     std::boxed::Box::new(core::default::Default::default())
 }
 impl ::core::ops::Deref for inheritance::MyObject {
     type Target = MyObjectRust;
     fn deref(&self) -> &Self::Target {
-        inheritance::cxx_qt_ffi_my_object_unsafe_rust(self)
+        inheritance::cxx_qt_ffi_MyObject_unsafeRust(self)
     }
 }
 impl ::cxx_qt::CxxQtType for inheritance::MyObject {
     type Rust = MyObjectRust;
     fn rust(&self) -> &Self::Rust {
-        inheritance::cxx_qt_ffi_my_object_unsafe_rust(self)
+        inheritance::cxx_qt_ffi_MyObject_unsafeRust(self)
     }
     fn rust_mut(self: core::pin::Pin<&mut Self>) -> core::pin::Pin<&mut Self::Rust> {
-        inheritance::cxx_qt_ffi_my_object_unsafe_rust_mut(self)
+        inheritance::cxx_qt_ffi_MyObject_unsafeRustMut(self)
     }
 }

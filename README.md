@@ -43,7 +43,7 @@ The [CXX-Qt Book](https://kdab.github.io/cxx-qt/book/getting-started/index.html)
 step-by-step and documents CXX-Qt's features for the latest release. The [examples folder](./examples) contains
 demonstrations of using threading, QQmlExtensionPlugin, and various other features.
 
-CXX-Qt is tested on CI on Linux, Windows, and macOS (all on x86_64). It should work on other platforms that Qt and
+CXX-Qt is tested on CI on Linux, Windows, macOS, and WebAssembly. It should work on other platforms that Qt and
 Rust both support, however, these are not tested regularly.
 
 CXX-Qt is in early development and the API changes frequently. For the latest documentation between releases, [install mdBook](https://rust-lang.github.io/mdBook/guide/installation.html)
@@ -116,12 +116,7 @@ example does not link with GNU ld.bfd which is the default linker on most Linux 
 installing [mold](https://github.com/rui314/mold), [lld](https://lld.llvm.org/), or GNU ld.gold
 (from GNU binutils but may be separate package) is required on Linux.
 
-On Windows and macOS vcpkg can be used by adding `-D VCPKG=ON` to the CMake configure step to
-automatically download release mode packages from GitHub Packages (this will take several minutes the first time you run CMake).
-Note that debug symbols are not built in these packages.
-
-CXX-Qt defaults to building with Qt6. If you want to build with Qt5 when both are installed,
-or you want to tell vcpkg to use Qt5, add `-D USE_QT5=ON` to the CMake configure step.
+CXX-Qt defaults to building with Qt6. If you want to build with Qt5 when both are installed, add `-D USE_QT5=ON` to the CMake configure step.
 
 ```bash
 cmake -S . -B build
