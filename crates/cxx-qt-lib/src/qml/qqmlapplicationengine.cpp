@@ -22,5 +22,11 @@ qqmlapplicationengineAsQQmlEngine(QQmlApplicationEngine& engine)
   return static_cast<QQmlEngine&>(engine);
 }
 
+void*
+qqmlapplicationengineSingletonInstance(QQmlApplicationEngine& engine, QAnyStringView uri, QAnyStringView typeName)
+{
+  return reinterpret_cast<void*>(engine.singletonInstance<QObject*>(uri, typeName));
+}
+
 }
 }

@@ -22,6 +22,9 @@ qqmlapplicationengineNew();
 QQmlEngine&
 qqmlapplicationengineAsQQmlEngine(QQmlApplicationEngine&);
 
+void*
+qqmlapplicationengineSingletonInstance(QQmlApplicationEngine& engine, QAnyStringView uri, QAnyStringView typeName);
+
 }
 }
 

@@ -12,6 +12,8 @@ mod ffi {
         type QStringList = crate::QStringList;
         include!("cxx-qt-lib/qurl.h");
         type QUrl = crate::QUrl;
+        include!("cxx-qt-lib/qanystringview.h");
+        type QAnyStringView<'a> = crate::QAnyStringView<'a>;
 
         include!("cxx-qt-lib/qqmlapplicationengine.h");
         type QQmlApplicationEngine;
@@ -68,6 +70,9 @@ mod ffi {
 
     #[namespace = "rust::cxxqtlib1"]
     unsafe extern "C++" {
+        include!("cxx-qt-lib/common.h");
+        type c_void = crate::c_void;
+
         #[doc(hidden)]
         #[rust_name = "qqmlapplicationengine_new"]
         fn qqmlapplicationengineNew() -> UniquePtr<QQmlApplicationEngine>;
@@ -77,6 +82,10 @@ mod ffi {
         fn qqmlapplicationengineAsQQmlEngine(
             ptr: Pin<&mut QQmlApplicationEngine>,
         ) -> Pin<&mut QQmlEngine>;
+
+        #[doc(hidden)]
+        #[rust_name = "qqmlapplicationengine_singleton_instance"]
+        fn qqmlapplicationengineSingletonInstance(ptr: Pin<&mut QQmlApplicationEngine>, uri: QAnyStringView, typeName: QAnyStringView) -> *mut c_void;
     }
 
     // QQmlApplicationEngine is not a trivial to CXX and is not relocatable in Qt
@@ -86,7 +95,7 @@ mod ffi {
     impl UniquePtr<QQmlApplicationEngine> {}
 }
 
-use crate::QQmlEngine;
+use crate::{c_void, QAnyStringView, QQmlEngine};
 use core::pin::Pin;
 
 pub use ffi::QQmlApplicationEngine;
@@ -100,5 +109,15 @@ impl QQmlApplicationEngine {
     /// Create a new QQmlApplicationEngine
     pub fn new() -> cxx::UniquePtr<Self> {
         ffi::qqmlapplicationengine_new()
+    }
+
+    pub fn singleton_instance<T>(self: Pin<&mut Self>, uri: QAnyStringView, type_name: QAnyStringView) -> Option<&mut T> {
+        unsafe {
+            let ptr = ffi::qqmlapplicationengine_singleton_instance(self, uri, type_name);
+            if ptr.is_null() {
+                return None;
+            }
+            Some(&mut *(ptr as *mut T))
+        }
     }
 }
