@@ -29,6 +29,8 @@ pub use versions::SemVer;
 
 use thiserror::Error;
 
+use cmake_package::find_package;
+
 #[derive(Error, Debug)]
 /// Errors that can occur while using [QtBuild]
 pub enum QtBuildError {
@@ -562,8 +564,18 @@ impl QtBuild {
         let lib_path = self.qmake_query("QT_INSTALL_LIBS");
         let mut paths = Vec::new();
         for qt_module in &self.qt_modules {
+            let package = find_package(format!("Qt6{}", qt_module)).find();
+            let target = match package {
+                Err(err) => panic!("{} not found: {:#?}", qt_module, err),
+                Ok(package) => {
+                    package.target(format!("Qt::{}", qt_module)).unwrap()
+                }
+            };
+
+            paths.extend(target.include_directories);
+
             // Add the usual location for the Qt module
-            paths.push(format!("{root_path}/Qt{qt_module}"));
+            //paths.push(format!("{root_path}/Qt{qt_module}"));
 
             // Ensure that we add any framework's headers path
             let header_path = format!("{lib_path}/Qt{qt_module}.framework/Headers");
